@@ -5,10 +5,30 @@
   <title>River Survey Dashboard</title>
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
 
-  <link rel="stylesheet" href="https://js.arcgis.com/4.31/esri/themes/light/main.css" />
+  <link rel="stylesheet" href="https://js.arcgis.com/4.31/esri/themes/dark/main.css" />
   <script src="https://js.arcgis.com/4.31/"></script>
 
   <style>
+    /* --- Dashboard-wide dark theme. One fixed palette (not tied to OS
+       preference - the whole app commits to dark, matching the chart's
+       surface/text tokens rather than the other way around) so every panel,
+       the chart, and the ArcGIS widgets all read as one consistent surface. --- */
+    :root {
+      color-scheme: dark;
+      --bg-page:        #121212;
+      --surface-1:      #1a1a19;
+      --surface-2:      #262624;
+      --surface-3:      #313130;
+      --border:         #3a3a37;
+      --border-strong:  #4a4a46;
+      --text-primary:   #f5f5f3;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #8f8d86;
+      --gridline:       #2c2c2a;
+      --baseline:       #454542;
+      --accent:         #3987e5;
+    }
+
     html, body {
       padding: 0;
       margin: 0;
@@ -16,6 +36,8 @@
       width: 100%;
       font-family: sans-serif;
       font-size: 14px;
+      background: var(--bg-page);
+      color: var(--text-primary);
     }
 
     #appContainer {
@@ -24,13 +46,14 @@
       width: 100%;
     }
 
-    /* --- Left sidebar: filters --- */
+    /* --- Left sidebar: filters - same width as the details panel on the
+       right, so the map sits evenly between two matched side panels. --- */
     #sidebar {
-      width: 240px;
+      width: 320px;
       flex-shrink: 0;
       padding: 16px;
-      background: #f4f4f4;
-      border-right: 1px solid #ccc;
+      background: var(--surface-1);
+      border-right: 1px solid var(--border);
       box-sizing: border-box;
       overflow-y: auto;
     }
@@ -38,6 +61,7 @@
     #sidebar h2 {
       font-size: 16px;
       margin-top: 0;
+      color: var(--text-primary);
     }
 
     #sidebar label {
@@ -46,51 +70,180 @@
       margin-bottom: 4px;
       font-weight: bold;
       font-size: 13px;
+      color: var(--text-secondary);
     }
 
     #orgFilter {
       width: 100%;
       padding: 6px;
       box-sizing: border-box;
+      background: var(--surface-2);
+      color: var(--text-primary);
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
     }
 
     #locationCount {
       margin-top: 16px;
       font-size: 13px;
-      color: #444;
+      color: var(--text-secondary);
     }
 
-    /* --- Center: the map --- */
+    /* --- Metric list: the single selector that drives both the map's
+       point symbology and the trend chart's plotted metric --- */
+    .metricList {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 4px;
+    }
+
+    .metricItem {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      background: none;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--text-secondary);
+      text-align: left;
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+
+    .metricItem:hover {
+      background: var(--surface-2);
+    }
+
+    .metricItem.active {
+      background: var(--surface-2);
+      border-color: var(--accent);
+      color: var(--text-primary);
+      font-weight: bold;
+    }
+
+    .metricSwatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .metricEmpty {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Mounts the ArcGIS Legend widget - it renders its own chrome inside,
+       themed dark by the esri/themes/dark stylesheet linked in <head>. That
+       stylesheet's dark surface is close to but not exactly our own, so it
+       reads as a faint box against the sidebar - made transparent here at
+       every level of the widget's markup so it shows the sidebar's own
+       background straight through instead of a near-but-not-quite match. */
+    #symbolLegend {
+      margin-top: 10px;
+    }
+
+    #symbolLegend .esri-legend {
+      max-width: 100%;
+      font-size: 12px;
+    }
+
+    /* Every descendant, not just the named container classes above - the
+       widget has size-ramp-specific variants (e.g.
+       esri-legend__layer-table--size-ramp) and other modifier classes that
+       carry their own background, so naming containers one by one kept
+       missing some. This blankets all of them at once. */
+    #symbolLegend * {
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+
+    /* --- Tabs: switch the main content between the map and the league table --- */
+    #tabBar {
+      display: flex;
+      gap: 4px;
+      margin-top: 14px;
+    }
+
+    .tabButton {
+      flex: 1;
+      padding: 6px 4px;
+      font-size: 12px;
+      font-weight: bold;
+      border: 1px solid var(--border-strong);
+      background: var(--surface-2);
+      color: var(--text-secondary);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .tabButton.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* --- Center: the map column (map + chart panel stacked), with the
+       details panel as a full-height sidebar alongside it --- */
+    #mapArea {
+      display: flex;
+      flex-direction: row;
+      flex-grow: 1;
+      min-width: 0;
+    }
+
+    /* The map + chart panel, stacked - only this column's width is spanned
+       by the chart, not the details panel beside it. */
+    #mapColumn {
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+      min-width: 0;
+    }
+
     #viewDiv {
       flex-grow: 1;
-      height: 100%;
+      min-height: 0;
+      /* Fallback while basemap tiles load, so it's dark from the first
+         paint rather than flashing white. */
+      background: var(--surface-1);
     }
 
-    /* --- Right panel: location details --- */
+    /* --- Right panel: location details - a flex row's children stretch to
+       fill its height by default, so this runs the full height of the map
+       area, chart panel included, not just alongside the map itself. --- */
     #detailsPanel {
       width: 320px;
       flex-shrink: 0;
       padding: 16px;
-      background: #fff;
-      border-left: 1px solid #ccc;
+      background: var(--surface-1);
+      border-left: 1px solid var(--border);
       box-sizing: border-box;
       overflow-y: auto;
+      color: var(--text-primary);
     }
 
     #detailsPanel h2 {
       font-size: 16px;
       margin-top: 0;
       margin-bottom: 2px;
+      color: var(--text-primary);
     }
 
     #detailsPanel .orgName {
-      color: #666;
+      color: var(--text-secondary);
       font-size: 13px;
       margin-bottom: 12px;
     }
 
     #detailsPlaceholder {
-      color: #888;
+      color: var(--text-muted);
       font-size: 13px;
     }
 
@@ -102,7 +255,7 @@
     }
 
     .statBox {
-      background: #f4f4f4;
+      background: var(--surface-2);
       border-radius: 4px;
       padding: 8px;
     }
@@ -110,11 +263,12 @@
     .statBox .value {
       font-size: 18px;
       font-weight: bold;
+      color: var(--text-primary);
     }
 
     .statBox .label {
       font-size: 11px;
-      color: #666;
+      color: var(--text-secondary);
     }
 
     .wildlifeTags {
@@ -125,8 +279,8 @@
     }
 
     .wildlifeTag {
-      background: #e3f2e1;
-      color: #2c5c28;
+      background: rgba(25, 158, 112, 0.18);
+      color: #6fd7a8;
       border-radius: 12px;
       padding: 3px 10px;
       font-size: 12px;
@@ -134,86 +288,308 @@
 
     #detailsPanel h3 {
       font-size: 13px;
-      border-top: 1px solid #eee;
+      border-top: 1px solid var(--border);
       padding-top: 12px;
       margin-bottom: 8px;
+      color: var(--text-primary);
     }
 
-    .observationRow {
-      border-bottom: 1px solid #eee;
-      padding: 8px 0;
-      font-size: 12px;
-    }
-
-    .observationRow .obsDate {
-      font-weight: bold;
-      margin-bottom: 4px;
-    }
-
-    .observationRow .obsMetric {
-      color: #555;
-    }
-
-    /* --- Water quality trend chart --- */
-    .viz-root {
-      color-scheme: light;
-      --surface-1:      #fcfcfb;
-      --text-primary:   #0b0b0b;
-      --text-secondary: #52514e;
-      --text-muted:     #898781;
-      --gridline:       #e1e0d9;
-      --baseline:       #c3c2b7;
-      --series-1:       #2a78d6;
-    }
-    @media (prefers-color-scheme: dark) {
-      .viz-root {
-        color-scheme: dark;
-        --surface-1:      #1a1a19;
-        --text-primary:   #ffffff;
-        --text-secondary: #c3c2b7;
-        --text-muted:     #898781;
-        --gridline:       #2c2c2a;
-        --baseline:       #383835;
-        --series-1:       #3987e5;
-      }
-    }
-
-    .chartControls {
+    /* --- Recent surveys: a one-card-at-a-time carousel over the last 5
+       surveys (newest first) rather than a flat list, so there's room to
+       show each visit's full detail - weather, rainfall, clarity, and its
+       photos - without crowding the sidebar. --- */
+    .surveyCarouselHeader {
       display: flex;
       align-items: center;
-      gap: 8px;
+      justify-content: space-between;
       margin-bottom: 8px;
     }
 
-    .chartControls label {
-      font-size: 12px;
-      color: var(--text-secondary);
-      white-space: nowrap;
+    .surveyNavBtn {
+      width: 26px;
+      height: 26px;
+      border-radius: 4px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface-2);
+      color: var(--text-primary);
+      font-size: 15px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
     }
 
-    #metricPicker {
-      flex: 1;
-      padding: 4px 6px;
+    .surveyNavBtn:hover:not(:disabled) {
+      background: var(--surface-3);
+    }
+
+    .surveyNavBtn:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    .surveyCarouselPosition {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .surveyCard {
+      background: var(--surface-2);
+      border-radius: 6px;
+      padding: 10px 12px;
       font-size: 12px;
+    }
+
+    .surveyDate {
+      font-weight: bold;
+      font-size: 13px;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+
+    .weatherTags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .weatherTag {
+      background: rgba(57, 135, 229, 0.18);
+      color: #7fb8f5;
+      border-radius: 12px;
+      padding: 3px 10px;
+      font-size: 11px;
+    }
+
+    .surveyFieldGrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 10px;
+      margin-bottom: 8px;
+    }
+
+    .surveyFieldLabel {
+      display: block;
+      color: var(--text-muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .surveyFieldValue {
+      color: var(--text-primary);
+    }
+
+    /* --- Water quality readings panel within a survey card - every metric
+       this survey actually recorded a value for (not a fixed subset),
+       color-swatched to match the same metric everywhere else (map,
+       sidebar list, chart). --- */
+    .surveyMetrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+
+    .surveyMetric {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .surveyMetricSwatch {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .surveyMetricLabel {
+      color: var(--text-secondary);
+      flex: 1;
+    }
+
+    .surveyMetricValue {
+      color: var(--text-primary);
+      font-weight: bold;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .surveyMetricsEmpty {
+      color: var(--text-muted);
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+
+    .surveyPhotos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .surveyPhotoThumb {
+      width: 52px;
+      height: 52px;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface-1);
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .surveyPhotoThumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .surveyPhotoThumb:hover {
+      border-color: var(--accent);
+    }
+
+    .surveyEmpty {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    /* --- Photo lightbox: a single overlay reused for whichever survey's
+       photos are open, with its own prev/next through that survey's set. --- */
+    #photoLightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 48px;
       box-sizing: border-box;
     }
 
-    .chartTitle {
+    #photoLightbox.open {
+      display: flex;
+    }
+
+    #photoLightbox img {
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 4px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    }
+
+    .lightboxClose {
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 30px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+
+    .lightboxNav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.12);
+      border: none;
+      color: #fff;
+      font-size: 26px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .lightboxNav:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .lightboxNav:disabled {
+      opacity: 0.25;
+      cursor: default;
+    }
+
+    #lightboxPrev {
+      left: 16px;
+    }
+
+    #lightboxNext {
+      right: 16px;
+    }
+
+    .lightboxCaption {
+      position: absolute;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--text-secondary);
       font-size: 12px;
+    }
+
+    /* --- Water quality trend chart: its own bar across the bottom of the
+       map area, not the details panel, so it stays visible however a
+       location's details scroll. --- */
+    #chartPanel {
+      flex: 0 0 30%;
+      min-height: 160px;
+      box-sizing: border-box;
+      padding: 12px 20px;
+      background: var(--surface-1);
+      border-top: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    #chartPlaceholder {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    /* The chart reads its colors from the same dashboard-wide tokens above
+       (--surface-1, --text-primary, --gridline, --baseline, etc.) rather
+       than its own light/dark pair, so it's guaranteed to match everything
+       else on the page instead of following the OS separately. */
+    #trendChartRoot {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chartTitle {
+      font-size: 13px;
       font-weight: bold;
       color: var(--text-primary);
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+      flex-shrink: 0;
     }
 
     .chartWrap {
       position: relative;
       background: var(--surface-1);
+      flex: 1;
+      min-height: 0;
     }
 
     .chartWrap svg {
       display: block;
       width: 100%;
-      height: auto;
+      height: 100%;
       overflow: visible;
     }
 
@@ -224,7 +600,14 @@
     .chartEmpty {
       font-size: 12px;
       color: var(--text-muted);
-      padding: 12px 0 4px;
+    }
+
+    .chartEmpty:not([hidden]) {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
     }
 
     .chartTooltip {
@@ -247,14 +630,100 @@
     .chartTooltip .ttDate {
       opacity: 0.75;
     }
+
+    /* --- Site league table --- */
+    #leagueArea {
+      display: none;
+      flex-grow: 1;
+      min-width: 0;
+      padding: 24px 32px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      background: var(--surface-1);
+      color: var(--text-primary);
+    }
+
+    .leagueHeader h2 {
+      font-size: 18px;
+      margin: 0 0 2px;
+      color: var(--text-primary);
+    }
+
+    .leagueOrgName {
+      color: var(--text-secondary);
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    #leagueEmpty {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    .tableScroll {
+      overflow-x: auto;
+    }
+
+    #leagueTable {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 13px;
+    }
+
+    #leagueTable th,
+    #leagueTable td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    #leagueTable td {
+      color: var(--text-primary);
+    }
+
+    #leagueTable th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--text-secondary);
+      border-bottom: 2px solid var(--border-strong);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    #leagueTable th:hover {
+      color: var(--accent);
+    }
+
+    #leagueTable th:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    #leagueTable tbody tr:hover {
+      background: var(--surface-2);
+    }
+
+    .leagueColNum {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .sortArrow {
+      color: var(--accent);
+      font-size: 9px;
+    }
   </style>
 
   <script>
     require([
       "esri/Map",
       "esri/views/MapView",
-      "esri/layers/FeatureLayer"
-    ], function (Map, MapView, FeatureLayer) {
+      "esri/layers/FeatureLayer",
+      "esri/widgets/Legend"
+    ], function (Map, MapView, FeatureLayer, Legend) {
 
       const BASE_URL = "https://services3.arcgis.com/Bb8lfThdhugyc4G3/arcgis/rest/services/National_River_Survey_Testing_Layer/FeatureServer";
 
@@ -273,25 +742,69 @@
           type: "simple-fill",
           color: [0, 0, 0, 0],
           outline: {
-            color: "#1f6feb",
+            color: "#3987e5",
             width: 2
           }
         }
       };
 
-      const locationsRenderer = {
-        type: "simple",
-        symbol: {
+      const MARKER_COLOR = "#e8590c";
+
+      // The single source of truth for every water quality metric the app
+      // shows anywhere - the sidebar's metric list, the map's point
+      // symbology, the trend chart, and the league table columns.
+      // `locationField` is this metric's per-site average on the
+      // locations layer (drives symbology + league table); `observationField`
+      // is its raw per-survey field on the observations table (drives the
+      // trend chart). Colors are the dataviz palette's fixed categorical
+      // order - kept in that order so the set stays colorblind-safe however
+      // many of the six an org ends up collecting. The dashboard is fixed
+      // dark throughout, so only `colorDark` (each metric's dark-surface
+      // variant) is used anywhere - `colorLight` is kept in case a light
+      // theme ever comes back, but nothing currently reads it.
+      const METRIC_CATALOG = [
+        { key: "phosphate", label: "Phosphate", locationField: "phosphateAverage", observationField: "phosphate", colorLight: "#2a78d6", colorDark: "#3987e5" },
+        { key: "nitrate", label: "Nitrate", locationField: "nitrateAverage", observationField: "nitrate", colorLight: "#eb6834", colorDark: "#d95926" },
+        { key: "nitrite", label: "Nitrite", locationField: "nitriteAverage", observationField: "nitrite", colorLight: "#1baf7a", colorDark: "#199e70" },
+        { key: "ammonia", label: "Ammonia", locationField: "ammoniaAverage", observationField: "ammonia", colorLight: "#eda100", colorDark: "#c98500" },
+        { key: "turbidity", label: "Turbidity", locationField: "turbidityAverage", observationField: "turbidity", colorLight: "#e87ba4", colorDark: "#d55181" },
+        { key: "conductivity", label: "Conductivity", locationField: "conductivityAverage", observationField: "conductivity", colorLight: "#008300", colorDark: "#008300" }
+      ];
+
+      // Builds the locations renderer. With no field (or a degenerate
+      // domain - every visible site sharing the same value) every point is
+      // a fixed size; otherwise a `size` visual variable scales each point
+      // between minSize and maxSize across the field's min/max for
+      // whatever's currently on screen.
+      function buildLocationsRenderer(field, minVal, maxVal, color) {
+        const symbol = {
           type: "simple-marker",
           style: "circle",
-          color: "#e8590c",
+          color: color || MARKER_COLOR,
           size: 8,
           outline: {
             color: "#ffffff",
             width: 1
           }
+        };
+
+        if (!field || minVal === null || minVal === undefined || maxVal === null || maxVal === undefined || minVal === maxVal) {
+          return { type: "simple", symbol: symbol };
         }
-      };
+
+        return {
+          type: "simple",
+          symbol: symbol,
+          visualVariables: [{
+            type: "size",
+            field: field,
+            minDataValue: minVal,
+            maxDataValue: maxVal,
+            minSize: 6,
+            maxSize: 28
+          }]
+        };
+      }
 
       // The map layer - shows organisations as polygons.
       // This is the default layer shown on the map.
@@ -311,7 +824,7 @@
         outFields: ["*"],
         popupEnabled: false, // we're building our own details panel instead
         visible: false,
-        renderer: locationsRenderer
+        renderer: buildLocationsRenderer(null, null, null)
       });
 
       // Used only for querying observation history - never added to the map
@@ -320,7 +833,7 @@
       });
 
       const map = new Map({
-        basemap: "topo-vector",
+        basemap: "dark-gray-vector",
         layers: [organisationLayer, locationsLayer]
       });
 
@@ -336,8 +849,215 @@
         zoom: INITIAL_ZOOM
       });
 
+      // How the selected location's point glows on the map - a soft halo
+      // in the same accent blue used for the active tab/metric elsewhere,
+      // so "selected" reads consistently whether you're looking at the
+      // sidebar or the map itself.
+      view.highlightOptions = {
+        color: "#3987e5",
+        haloOpacity: 1,
+        fillOpacity: 0.25
+      };
+
+      // Resolved once, reused for every highlight - `view.whenLayerView`
+      // is only needed the first time.
+      const locationsLayerViewPromise = view.whenLayerView(locationsLayer);
+      let highlightHandle = null;
+
+      // Removes the glow from whichever location is currently highlighted,
+      // if any - called before highlighting a new one, and whenever the
+      // organisation selection changes (a highlight left over from another
+      // org's site would be pointing at a now-hidden or filtered-out point).
+      function clearLocationHighlight() {
+        if (highlightHandle) {
+          highlightHandle.remove();
+          highlightHandle = null;
+        }
+      }
+
+      // --- Resets the details panel and chart panel back to their
+      //     "nothing selected" placeholders, and drops the map glow - used
+      //     whenever the currently-open location stops being relevant, i.e.
+      //     switching to a different organisation or back to "All
+      //     organisations" (see selectOrganisation). Without this the
+      //     panels kept showing the previous org's site after switching,
+      //     which no longer made sense once its point wasn't even on
+      //     screen any more. ---
+      function clearLocationSelection() {
+        clearLocationHighlight();
+
+        document.getElementById("detailsContent").style.display = "none";
+        document.getElementById("detailsPlaceholder").style.display = "block";
+
+        document.getElementById("trendChartRoot").style.display = "none";
+        document.getElementById("chartPlaceholder").style.display = "block";
+
+        currentObservations = [];
+        dailyObservations = [];
+        recentObservations = [];
+        surveyIndex = 0;
+        renderSurveyCard();
+      }
+
+      // The size legend should only ever describe the points, never the
+      // organisation outline layer.
+      organisationLayer.legendEnabled = false;
+
+      const legend = new Legend({
+        view: view,
+        container: "symbolLegend",
+        layerInfos: []
+      });
+
       const orgFilter = document.getElementById("orgFilter");
       const locationCount = document.getElementById("locationCount");
+      const metricListLabel = document.getElementById("metricListLabel");
+      const metricListEl = document.getElementById("metricList");
+      const symbolLegend = document.getElementById("symbolLegend");
+
+      // --- The metric list: a single selector (styled like a layer list,
+      //     not a dropdown) that drives BOTH the map's point symbology and
+      //     the trend chart's plotted metric, so there's one source of
+      //     truth instead of two pickers that could disagree.
+      //
+      //     `availableMetrics` narrows to whatever the selected
+      //     organisation actually collects - some orgs (e.g. one that only
+      //     runs phosphate/turbidity/conductivity tests) don't gather every
+      //     metric, and offering the rest just invites picking one with no
+      //     data. That's read off `leagueRows` (see loadLeagueTable) rather
+      //     than a separate query: a metric counts as "collected" if at
+      //     least one of the org's sites has a non-null average for it. ---
+      let selectedMetricKey = METRIC_CATALOG[0].key;
+      let availableMetrics = METRIC_CATALOG.slice();
+
+      function updateAvailableMetrics() {
+        if (leagueRows.length === 0) {
+          // No organisation selected (or it has no sites yet) - nothing to
+          // narrow by, so offer everything.
+          availableMetrics = METRIC_CATALOG.slice();
+        } else {
+          availableMetrics = METRIC_CATALOG.filter(function (m) {
+            return leagueRows.some(function (r) { return r[m.locationField] !== null && r[m.locationField] !== undefined; });
+          });
+          if (availableMetrics.length === 0) availableMetrics = METRIC_CATALOG.slice();
+        }
+
+        if (!selectedMetricKey || !availableMetrics.some(function (m) { return m.key === selectedMetricKey; })) {
+          selectedMetricKey = availableMetrics.length ? availableMetrics[0].key : null;
+        }
+
+        renderMetricList();
+        updateSymbology();
+      }
+
+      function renderMetricList() {
+        metricListEl.innerHTML = "";
+
+        if (availableMetrics.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "metricEmpty";
+          empty.textContent = "No water quality metrics available.";
+          metricListEl.appendChild(empty);
+          return;
+        }
+
+        availableMetrics.forEach(function (m) {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = "metricItem" + (m.key === selectedMetricKey ? " active" : "");
+          item.setAttribute("role", "option");
+          item.setAttribute("aria-selected", m.key === selectedMetricKey ? "true" : "false");
+
+          const swatch = document.createElement("span");
+          swatch.className = "metricSwatch";
+          swatch.style.background = m.colorDark;
+
+          const label = document.createElement("span");
+          label.textContent = m.label;
+
+          item.appendChild(swatch);
+          item.appendChild(label);
+          item.addEventListener("click", function () { selectMetric(m.key); });
+
+          metricListEl.appendChild(item);
+        });
+      }
+
+      function selectMetric(key) {
+        if (key === selectedMetricKey) return;
+        selectedMetricKey = key;
+        renderMetricList();
+        updateSymbology();
+        // A location's chart may already be open - keep it in sync with
+        // the newly picked metric rather than waiting for the next click.
+        if (currentObservations.length > 0) renderChart();
+      }
+
+      // --- Size the location points by whichever metric is selected,
+      //     scaled to the min/max of that metric among the currently
+      //     selected organisation's sites (or every site when none is
+      //     selected) - not the whole layer, so the size range stays
+      //     meaningful for what's actually visible. Reads from the
+      //     already-cached `leagueRows` rather than a fresh query. Shows
+      //     the scale through the ArcGIS Legend widget rather than a
+      //     hand-written sentence. ---
+      function updateSymbology() {
+        const metric = METRIC_CATALOG.find(function (m) { return m.key === selectedMetricKey; });
+
+        if (!metric) {
+          locationsLayer.renderer = buildLocationsRenderer(null, null, null, MARKER_COLOR);
+          legend.layerInfos = [];
+          return;
+        }
+
+        const values = leagueRows
+          .map(function (r) { return r[metric.locationField]; })
+          .filter(function (v) { return v !== null && v !== undefined; });
+
+        const minVal = values.length ? Math.min.apply(null, values) : null;
+        const maxVal = values.length ? Math.max.apply(null, values) : null;
+
+        locationsLayer.renderer = buildLocationsRenderer(metric.locationField, minVal, maxVal, metric.colorDark);
+        locationsLayer.title = metric.label;
+        legend.layerInfos = [{ layer: locationsLayer, title: metric.label }];
+      }
+
+      // --- Tabs: Map (the existing view) and Site league table share the
+      //     same organisation dropdown in the sidebar, so switching tabs
+      //     never loses the current selection. The map's own view is never
+      //     torn down when hidden - just its container - so switching back
+      //     to it is instant. ---
+      const tabButtons = document.querySelectorAll(".tabButton");
+      const mapArea = document.getElementById("mapArea");
+      const leagueArea = document.getElementById("leagueArea");
+
+      tabButtons.forEach(function (btn) {
+        btn.addEventListener("click", function () { switchTab(btn.dataset.tab); });
+      });
+
+      function switchTab(tab) {
+        tabButtons.forEach(function (btn) {
+          btn.classList.toggle("active", btn.dataset.tab === tab);
+        });
+        mapArea.style.display = tab === "map" ? "flex" : "none";
+        leagueArea.style.display = tab === "league" ? "block" : "none";
+        locationCount.style.display = tab === "map" ? "block" : "none";
+        metricListLabel.style.display = tab === "map" ? "block" : "none";
+        metricListEl.style.display = tab === "map" ? "flex" : "none";
+        symbolLegend.style.display = tab === "map" ? "block" : "none";
+
+        if (tab === "league") {
+          loadLeagueTable(orgFilter.value);
+        }
+
+        // The chart panel is measured from its own rendered size (see
+        // renderChart), so if it was resized while the map tab was
+        // hidden (display:none doesn't get a size), redraw it now that
+        // it's visible again - but only if a location is actually open.
+        if (tab === "map" && dailyObservations.length > 0) {
+          renderChart();
+        }
+      }
 
       // --- Populate the organisation dropdown with real values from the data ---
       // We query for DISTINCT organisation_name values rather than hardcoding
@@ -376,6 +1096,12 @@
       //     hand, so it's looked up. ---
       function selectOrganisation(orgName, geometry) {
         orgFilter.value = orgName || "";
+        loadLeagueTable(orgName || "");
+        // Whatever location was selected (glow, details panel, chart)
+        // belonged to the previous org - never carry it over to a
+        // different org's map, or leave it showing once every org is
+        // cleared.
+        clearLocationSelection();
 
         if (!orgName) {
           organisationLayer.definitionExpression = "";
@@ -447,8 +1173,20 @@
       function showLocationDetails(graphic) {
         const attrs = graphic.attributes;
 
+        // Glow the clicked point so it's obvious which site the panel and
+        // chart below now describe. Swaps in as soon as the layer view is
+        // ready - already resolved after the first click, so this is
+        // effectively instant from then on.
+        locationsLayerViewPromise.then(function (layerView) {
+          clearLocationHighlight();
+          highlightHandle = layerView.highlight(graphic);
+        });
+
         document.getElementById("detailsPlaceholder").style.display = "none";
         document.getElementById("detailsContent").style.display = "block";
+
+        document.getElementById("chartPlaceholder").style.display = "none";
+        document.getElementById("trendChartRoot").style.display = "flex";
 
         document.getElementById("locationName").innerText = attrs.locationName || "(unnamed location)";
         document.getElementById("locationOrg").innerText = attrs.organisationName || "";
@@ -491,110 +1229,467 @@
         return (value === null || value === undefined) ? "-" : Number(value).toFixed(1);
       }
 
-      // --- The metrics the trend chart can plot, and the picker that
-      //     drives it. `currentObservations` holds the full, ascending-by-
-      //     date survey history for whichever location is currently open -
-      //     fetched once per location click, then re-used (no requery) each
-      //     time the picker switches metric. ---
-      const METRIC_DEFS = [
-        { field: "phosphate", label: "Phosphate" },
-        { field: "nitrate", label: "Nitrate" },
-        { field: "nitrite", label: "Nitrite" },
-        { field: "ammonia", label: "Ammonia" },
-        { field: "turbidity", label: "Turbidity" },
-        { field: "conductivity", label: "Conductivity" },
-        { field: "water_temperature", label: "Water temperature" }
+      // --- Site league table: ranks every site belonging to one
+      //     organisation by any water quality metric. Unlike the trend
+      //     chart, this doesn't need the Observations table at all - the
+      //     locations layer already stores a per-site average for each
+      //     metric (checked against the live service's field list), so one
+      //     query against `locationsLayer` gets everything the table needs.
+      //     Sorting then happens client-side against the cached rows, so
+      //     clicking a different column header is instant, not a requery.
+      //
+      //     `leagueRows` is also what the sidebar's metric list and the
+      //     map's symbology read to figure out which metrics this
+      //     organisation actually collects, and their min/max - see
+      //     updateAvailableMetrics / updateSymbology. ---
+      const LEAGUE_COLUMNS = [
+        { field: "locationName", label: "Location", type: "text" },
+        { field: "totalSurveys", label: "Surveys", type: "number" }
+      ].concat(METRIC_CATALOG.map(function (m) {
+        return { field: m.locationField, label: m.label, type: "number" };
+      }));
+
+      let leagueRows = []; // cached site attributes for the org currently shown
+      let leagueSort = { field: "locationName", direction: "asc" };
+
+      // Call with "" (e.g. "All organisations") to clear the table and show
+      // the prompt instead.
+      function loadLeagueTable(orgName) {
+        const emptyEl = document.getElementById("leagueEmpty");
+        const wrapEl = document.getElementById("leagueTableWrap");
+        const subtitleEl = document.getElementById("leagueSubtitle");
+
+        leagueRows = [];
+        wrapEl.style.display = "none";
+        updateAvailableMetrics();
+
+        if (!orgName) {
+          subtitleEl.textContent = "";
+          emptyEl.textContent = "Select an organisation from the sidebar to see its site league table.";
+          emptyEl.hidden = false;
+          return;
+        }
+
+        subtitleEl.textContent = orgName;
+        emptyEl.textContent = "Loading sites...";
+        emptyEl.hidden = false;
+
+        const escapedName = orgName.replace(/'/g, "''");
+        const query = locationsLayer.createQuery();
+        query.where = `organisationName = '${escapedName}'`;
+        query.returnGeometry = false;
+        query.outFields = ["locationName", "totalSurveys"].concat(METRIC_CATALOG.map(function (m) { return m.locationField; }));
+
+        locationsLayer.queryFeatures(query).then(function (result) {
+          // A stale response for an org the user has since navigated away
+          // from shouldn't clobber what's on screen now.
+          if (orgFilter.value !== orgName) return;
+
+          leagueRows = result.features.map(function (f) { return f.attributes; });
+          updateAvailableMetrics();
+
+          if (leagueRows.length === 0) {
+            emptyEl.textContent = "No sites found for this organisation.";
+            emptyEl.hidden = false;
+            return;
+          }
+
+          emptyEl.hidden = true;
+          wrapEl.style.display = "block";
+          renderLeagueTable();
+        }).catch(function (error) {
+          if (orgFilter.value !== orgName) return;
+          emptyEl.textContent = "Couldn't load the league table.";
+          emptyEl.hidden = false;
+          console.error(error);
+        });
+      }
+
+      // Renders (and re-renders on every sort change) from the cached
+      // `leagueRows` - no requery needed to re-sort.
+      function renderLeagueTable() {
+        const headRow = document.getElementById("leagueTableHeadRow");
+        const body = document.getElementById("leagueTableBody");
+
+        headRow.innerHTML = "";
+        LEAGUE_COLUMNS.forEach(function (col) {
+          const th = document.createElement("th");
+          th.className = col.type === "number" ? "leagueColNum" : "leagueColText";
+          th.tabIndex = 0;
+          th.setAttribute("role", "button");
+          th.setAttribute("aria-sort", leagueSort.field === col.field
+            ? (leagueSort.direction === "asc" ? "ascending" : "descending")
+            : "none");
+
+          const labelSpan = document.createElement("span");
+          labelSpan.textContent = col.label;
+          th.appendChild(labelSpan);
+
+          if (leagueSort.field === col.field) {
+            const arrow = document.createElement("span");
+            arrow.className = "sortArrow";
+            arrow.textContent = leagueSort.direction === "asc" ? " ▲" : " ▼";
+            th.appendChild(arrow);
+          }
+
+          function activateSort() {
+            if (leagueSort.field === col.field) {
+              leagueSort = { field: col.field, direction: leagueSort.direction === "asc" ? "desc" : "asc" };
+            } else {
+              // First click on a numeric column leads with the highest
+              // value; a text column (just Location) leads A-Z.
+              leagueSort = { field: col.field, direction: col.type === "number" ? "desc" : "asc" };
+            }
+            renderLeagueTable();
+          }
+
+          th.addEventListener("click", activateSort);
+          th.addEventListener("keydown", function (evt) {
+            if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); activateSort(); }
+          });
+
+          headRow.appendChild(th);
+        });
+
+        const sorted = leagueRows.slice().sort(function (a, b) {
+          const av = a[leagueSort.field];
+          const bv = b[leagueSort.field];
+          const aMissing = av === null || av === undefined;
+          const bMissing = bv === null || bv === undefined;
+
+          // Missing readings sort to the bottom regardless of direction,
+          // rather than masquerading as zero.
+          if (aMissing && bMissing) return 0;
+          if (aMissing) return 1;
+          if (bMissing) return -1;
+
+          const cmp = typeof av === "string" ? av.localeCompare(bv) : av - bv;
+          return leagueSort.direction === "asc" ? cmp : -cmp;
+        });
+
+        body.innerHTML = "";
+        sorted.forEach(function (row) {
+          const tr = document.createElement("tr");
+          LEAGUE_COLUMNS.forEach(function (col) {
+            const td = document.createElement("td");
+            td.className = col.type === "number" ? "leagueColNum" : "leagueColText";
+            const value = row[col.field];
+            td.textContent = (value === null || value === undefined)
+              ? "-"
+              : (col.type === "number" ? formatTickValue(value) : value);
+            tr.appendChild(td);
+          });
+          body.appendChild(tr);
+        });
+      }
+
+      // `currentObservations` holds the full, ascending-by-date survey
+      // history for whichever location is currently open - fetched once
+      // per location click, then re-used (no requery) whenever the
+      // sidebar's metric list picks a different metric (see selectMetric).
+      //
+      // `dailyObservations` is derived from it by averaging together any
+      // surveys that fall on the same calendar day, so a day with two
+      // visits plots as one point rather than two - see
+      // groupObservationsByDay. The chart reads from this instead.
+      //
+      // `recentObservations` is the last 5 surveys, newest first - what the
+      // "Recent surveys" carousel flicks through. `surveyIndex` is which of
+      // those 5 is currently showing (0 = most recent).
+      let currentObservations = [];
+      let dailyObservations = [];
+      let recentObservations = [];
+      let surveyIndex = 0;
+
+      // Every weather checkbox is its own "Yes"/null field on the
+      // observations table (see loadObservations) - any number can be set
+      // on one survey (e.g. sunny AND windy).
+      const WEATHER_FIELDS = [
+        { field: "weather_sunny", label: "Sunny" },
+        { field: "weather_cloudy", label: "Cloudy" },
+        { field: "weather_rainy", label: "Rainy" },
+        { field: "weather_windy", label: "Windy" },
+        { field: "weather_snowy", label: "Snowy" }
       ];
 
-      let currentObservations = [];
+      // Up to 4 photos per survey - "Photo4" (capital P) is how the field
+      // is actually named on the service, unlike the lowercase photo1-3.
+      const PHOTO_FIELDS = ["photo1", "photo2", "photo3", "Photo4"];
 
-      document.getElementById("metricPicker").addEventListener("change", renderChart);
+      // Free-text fields (clarity, water_level, water_flow, rain) come back
+      // lowercase from the source form (e.g. "clear", "steady") - title-case
+      // them for display rather than showing raw form values verbatim.
+      function capitalize(value) {
+        return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+      }
 
       // --- Query the Observations table for this location's full survey
       //     history. locationID is a GUID field - the value from the
       //     location graphic already comes back wrapped in curly braces,
       //     so we just quote it. ---
       function loadObservations(locationID) {
-        const listEl = document.getElementById("observationsList");
-        listEl.innerHTML = "Loading recent surveys...";
         currentObservations = [];
+        dailyObservations = [];
+        recentObservations = [];
+        surveyIndex = 0;
         renderChart();
+        renderSurveyCard();
 
-        if (!locationID) {
-          listEl.innerHTML = "No location ID available.";
-          return;
-        }
+        if (!locationID) return;
 
         const query = observationsTable.createQuery();
         query.where = `locationID = '${locationID}'`;
         query.outFields = [
           "created_at", "water_temperature", "conductivity",
           "turbidity", "phosphate", "nitrate", "nitrite",
-          "ammonia", "clarity", "water_level", "water_flow"
-        ];
+          "ammonia", "clarity", "water_level", "water_flow",
+          "rain_previous_24hrs"
+        ].concat(WEATHER_FIELDS.map(function (w) { return w.field; }))
+          .concat(PHOTO_FIELDS);
         query.orderByFields = ["created_at ASC"]; // ascending - the chart needs oldest-first
 
         observationsTable.queryFeatures(query).then(function (result) {
           currentObservations = result.features;
-
-          if (result.features.length === 0) {
-            listEl.innerHTML = "<p style='color:#888;'>No survey records found for this location.</p>";
-            renderChart();
-            return;
-          }
-
-          // The list still shows the most recent 10, newest first.
-          const recent = currentObservations.slice(-10).reverse();
-
-          listEl.innerHTML = "";
-          recent.forEach(function (feature) {
-            const a = feature.attributes;
-            const row = document.createElement("div");
-            row.className = "observationRow";
-
-            const dateStr = a.created_at
-              ? new Date(a.created_at).toLocaleDateString()
-              : "Unknown date";
-
-            row.innerHTML = `
-              <div class="obsDate">${dateStr}</div>
-              <div class="obsMetric">Clarity: ${a.clarity ?? "-"} | Flow: ${a.water_flow ?? "-"} | Level: ${a.water_level ?? "-"}</div>
-              <div class="obsMetric">Phosphate: ${a.phosphate ?? "-"} | Nitrate: ${a.nitrate ?? "-"} | Ammonia: ${a.ammonia ?? "-"}</div>
-            `;
-            listEl.appendChild(row);
-          });
+          dailyObservations = groupObservationsByDay(currentObservations);
+          // Newest first, capped to the last 5 - the carousel flicks
+          // through these rather than a long flat list.
+          recentObservations = currentObservations.slice(-5).reverse();
+          surveyIndex = 0;
 
           renderChart();
+          renderSurveyCard();
         }).catch(function (error) {
-          listEl.innerHTML = "<p style='color:#a00;'>Couldn't load observations.</p>";
           console.error(error);
           renderChart();
+          renderSurveyCard();
         });
       }
 
+      // --- Renders whichever of the last 5 surveys `surveyIndex` points
+      //     at into the carousel card: date, weather tags, rainfall,
+      //     clarity/level/flow, water quality readings, and a thumbnail
+      //     strip for any photos - each opening the lightbox on click. ---
+      function renderSurveyCard() {
+        const carousel = document.getElementById("surveyCarousel");
+        const emptyEl = document.getElementById("surveyEmpty");
+        const prevBtn = document.getElementById("surveyPrevBtn");
+        const nextBtn = document.getElementById("surveyNextBtn");
+        const positionEl = document.getElementById("surveyPosition");
+        const cardEl = document.getElementById("surveyCard");
+
+        if (recentObservations.length === 0) {
+          carousel.style.display = "none";
+          emptyEl.hidden = false;
+          emptyEl.textContent = currentObservations.length === 0 && dailyObservations.length === 0
+            ? "No survey records found for this location."
+            : "";
+          return;
+        }
+
+        carousel.style.display = "";
+        emptyEl.hidden = true;
+
+        const a = recentObservations[surveyIndex].attributes;
+
+        positionEl.textContent = (surveyIndex + 1) + " of " + recentObservations.length;
+        prevBtn.disabled = surveyIndex === 0;
+        nextBtn.disabled = surveyIndex === recentObservations.length - 1;
+
+        const dateStr = a.created_at ? formatDateLong(a.created_at) : "Unknown date";
+
+        const weatherTagsHtml = WEATHER_FIELDS
+          .filter(function (w) { return a[w.field]; })
+          .map(function (w) { return '<span class="weatherTag">' + w.label + '</span>'; })
+          .join("");
+
+        const photos = PHOTO_FIELDS
+          .map(function (field) { return a[field]; })
+          .filter(function (url) { return url; });
+
+        const photosHtml = photos.length
+          ? '<div class="surveyPhotos">' + photos.map(function (url, i) {
+              return '<button type="button" class="surveyPhotoThumb" data-photo-index="' + i + '">' +
+                '<img src="' + url + '" alt="Photo ' + (i + 1) + ' from the survey on ' + dateStr + '" loading="lazy" /></button>';
+            }).join("") + '</div>'
+          : "";
+
+        // Every water quality metric this particular survey actually
+        // recorded, not a fixed subset - rounded to 1dp (the raw values
+        // sometimes come back as long floats, e.g. 1.300000121) and
+        // color-swatched to match the same metric on the map/sidebar/chart.
+        const surveyMetrics = METRIC_CATALOG.filter(function (m) {
+          const v = a[m.observationField];
+          return v !== null && v !== undefined;
+        });
+
+        const metricsHtml = surveyMetrics.length
+          ? '<div class="surveyMetrics">' + surveyMetrics.map(function (m) {
+              return '<div class="surveyMetric">' +
+                '<span class="surveyMetricSwatch" style="background:' + m.colorDark + '"></span>' +
+                '<span class="surveyMetricLabel">' + m.label + '</span>' +
+                '<span class="surveyMetricValue">' + formatNumber(a[m.observationField]) + '</span>' +
+                '</div>';
+            }).join("") + '</div>'
+          : '<div class="surveyMetricsEmpty">No water quality readings recorded for this survey.</div>';
+
+        cardEl.innerHTML = `
+          <div class="surveyDate">${dateStr}</div>
+          ${weatherTagsHtml ? '<div class="weatherTags">' + weatherTagsHtml + '</div>' : ""}
+          <div class="surveyFieldGrid">
+            <div><span class="surveyFieldLabel">Rainfall (24h)</span><span class="surveyFieldValue">${capitalize(a.rain_previous_24hrs) || "-"}</span></div>
+            <div><span class="surveyFieldLabel">Clarity</span><span class="surveyFieldValue">${capitalize(a.clarity) || "-"}</span></div>
+            <div><span class="surveyFieldLabel">Water level</span><span class="surveyFieldValue">${capitalize(a.water_level) || "-"}</span></div>
+            <div><span class="surveyFieldLabel">Flow</span><span class="surveyFieldValue">${capitalize(a.water_flow) || "-"}</span></div>
+          </div>
+          ${metricsHtml}
+          ${photosHtml}
+        `;
+
+        cardEl.querySelectorAll(".surveyPhotoThumb").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            openLightbox(photos, Number(btn.dataset.photoIndex), dateStr);
+          });
+        });
+      }
+
+      document.getElementById("surveyPrevBtn").addEventListener("click", function () {
+        if (surveyIndex > 0) { surveyIndex--; renderSurveyCard(); }
+      });
+      document.getElementById("surveyNextBtn").addEventListener("click", function () {
+        if (surveyIndex < recentObservations.length - 1) { surveyIndex++; renderSurveyCard(); }
+      });
+
+      // --- Photo lightbox: one overlay, reused for whichever survey's
+      //     photos are open, with its own prev/next through that set. ---
+      let lightboxPhotos = [];
+      let lightboxIndex = 0;
+      let lightboxCaptionPrefix = "";
+
+      function openLightbox(photos, startIndex, captionPrefix) {
+        lightboxPhotos = photos;
+        lightboxCaptionPrefix = captionPrefix;
+        lightboxIndex = startIndex;
+        document.getElementById("photoLightbox").classList.add("open");
+        renderLightboxPhoto();
+      }
+
+      function closeLightbox() {
+        document.getElementById("photoLightbox").classList.remove("open");
+      }
+
+      function renderLightboxPhoto() {
+        const img = document.getElementById("lightboxImg");
+        const caption = document.getElementById("lightboxCaption");
+        const prevBtn = document.getElementById("lightboxPrev");
+        const nextBtn = document.getElementById("lightboxNext");
+
+        img.src = lightboxPhotos[lightboxIndex];
+        img.alt = "Photo " + (lightboxIndex + 1) + " from the survey on " + lightboxCaptionPrefix;
+        caption.textContent = lightboxCaptionPrefix + " - photo " + (lightboxIndex + 1) + " of " + lightboxPhotos.length;
+
+        prevBtn.disabled = lightboxIndex === 0;
+        nextBtn.disabled = lightboxIndex === lightboxPhotos.length - 1;
+        prevBtn.style.display = lightboxPhotos.length > 1 ? "" : "none";
+        nextBtn.style.display = lightboxPhotos.length > 1 ? "" : "none";
+      }
+
+      document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
+      document.getElementById("lightboxPrev").addEventListener("click", function () {
+        if (lightboxIndex > 0) { lightboxIndex--; renderLightboxPhoto(); }
+      });
+      document.getElementById("lightboxNext").addEventListener("click", function () {
+        if (lightboxIndex < lightboxPhotos.length - 1) { lightboxIndex++; renderLightboxPhoto(); }
+      });
+      // Click the dark backdrop (not the image or controls) to close.
+      document.getElementById("photoLightbox").addEventListener("click", function (evt) {
+        if (evt.target.id === "photoLightbox") closeLightbox();
+      });
+      document.addEventListener("keydown", function (evt) {
+        if (!document.getElementById("photoLightbox").classList.contains("open")) return;
+        if (evt.key === "Escape") closeLightbox();
+        else if (evt.key === "ArrowLeft" && lightboxIndex > 0) { lightboxIndex--; renderLightboxPhoto(); }
+        else if (evt.key === "ArrowRight" && lightboxIndex < lightboxPhotos.length - 1) { lightboxIndex++; renderLightboxPhoto(); }
+      });
+
+      // --- Group a location's raw survey rows into one row per calendar
+      //     day, averaging each metric across every survey that landed on
+      //     that day. "If there are two surveys on the same day, let's take
+      //     the average of that day" - so a day with two visits plots as
+      //     one point, not two. Grouped by local calendar day; the day's
+      //     timestamp is midnight of that day. The "Recent surveys"
+      //     carousel still reads the raw, un-averaged rows - only the
+      //     chart uses this. ---
+      function groupObservationsByDay(features) {
+        // A plain object, not a JS Map - `Map` is the name of the ArcGIS
+        // esri/Map class injected as this callback's first parameter, so
+        // it's shadowed for this entire scope and `new Map()` here would
+        // silently construct the wrong thing.
+        const byDay = {}; // "Y-M-D" -> { date, sums: { field: {total, count} } }
+
+        features.forEach(function (f) {
+          const a = f.attributes;
+          if (a.created_at === null || a.created_at === undefined) return;
+
+          const d = new Date(a.created_at);
+          const dayKey = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+
+          if (!byDay[dayKey]) {
+            byDay[dayKey] = {
+              date: new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(),
+              sums: {}
+            };
+          }
+          const entry = byDay[dayKey];
+
+          METRIC_CATALOG.forEach(function (m) {
+            const v = a[m.observationField];
+            if (v === null || v === undefined) return;
+            if (!entry.sums[m.observationField]) entry.sums[m.observationField] = { total: 0, count: 0 };
+            entry.sums[m.observationField].total += v;
+            entry.sums[m.observationField].count += 1;
+          });
+        });
+
+        const days = Object.keys(byDay).map(function (dayKey) {
+          const entry = byDay[dayKey];
+          const attributes = { created_at: entry.date };
+          METRIC_CATALOG.forEach(function (m) {
+            const s = entry.sums[m.observationField];
+            attributes[m.observationField] = s ? s.total / s.count : null;
+          });
+          return { attributes: attributes };
+        });
+
+        days.sort(function (a, b) { return a.attributes.created_at - b.attributes.created_at; });
+        return days;
+      }
+
       // --- Draw the trend chart for whichever metric is currently picked,
-      //     from the already-fetched `currentObservations`. A line chart is
-      //     the right form here (a single measurement, changing over time),
-      //     so it gets one series in the sequential accent hue, a crosshair
-      //     that snaps to the nearest reading, and a direct label on the
-      //     most recent value - no legend box, since the title already
-      //     names the one thing being plotted. ---
+      //     from `dailyObservations` (same-day surveys already averaged
+      //     into one point per day - see groupObservationsByDay). A line
+      //     chart is the right form here (a single measurement, changing
+      //     over time), so it gets one series in the sequential accent hue,
+      //     a crosshair that snaps to the nearest reading, and a direct
+      //     label on the most recent value - no legend box, since the
+      //     title already names the one thing being plotted. The panel now
+      //     spans the bottom of the map area, so its size is measured from
+      //     the actual (wide, short) container rather than assumed. ---
       function renderChart() {
         const svg = document.getElementById("trendChartSvg");
         const tooltip = document.getElementById("chartTooltip");
         const emptyEl = document.getElementById("chartEmpty");
         const titleEl = document.getElementById("chartTitle");
-        const metricPicker = document.getElementById("metricPicker");
+        const wrapEl = document.querySelector("#trendChartRoot .chartWrap");
 
-        const metric = METRIC_DEFS.find(function (m) { return m.field === metricPicker.value; }) || METRIC_DEFS[0];
+        const metric = METRIC_CATALOG.find(function (m) { return m.key === selectedMetricKey; }) || METRIC_CATALOG[0];
         titleEl.textContent = metric.label + " over time";
 
         svg.innerHTML = "";
         tooltip.hidden = true;
 
-        const points = currentObservations
+        const points = dailyObservations
           .map(function (f) {
-            return { date: f.attributes.created_at, value: f.attributes[metric.field] };
+            return { date: f.attributes.created_at, value: f.attributes[metric.observationField] };
           })
           .filter(function (p) {
             return p.date !== null && p.date !== undefined && p.value !== null && p.value !== undefined;
@@ -605,16 +1700,21 @@
           emptyEl.hidden = false;
           emptyEl.textContent = points.length === 0
             ? "No " + metric.label.toLowerCase() + " readings recorded for this location."
-            : "Only one " + metric.label.toLowerCase() + " reading recorded - not enough to chart a trend.";
+            : "Only one day of " + metric.label.toLowerCase() + " readings recorded - not enough to chart a trend.";
           return;
         }
 
         svg.style.display = "block";
         emptyEl.hidden = true;
 
-        // --- Layout ---
-        const width = 300, height = 170;
-        const marginLeft = 38, marginRight = 12, marginTop = 12, marginBottom = 24;
+        // --- Layout - measured from the panel's actual rendered size
+        //     (wide and short along the bottom of the map) rather than the
+        //     old fixed sidebar dimensions, with sane fallbacks in case the
+        //     panel isn't laid out yet (e.g. still display:none). ---
+        const wrapRect = wrapEl.getBoundingClientRect();
+        const width = Math.max(Math.round(wrapRect.width) || 0, 300);
+        const height = Math.max(Math.round(wrapRect.height) || 0, 120);
+        const marginLeft = 42, marginRight = 16, marginTop = 14, marginBottom = 26;
         const plotW = width - marginLeft - marginRight;
         const plotH = height - marginTop - marginBottom;
 
@@ -639,9 +1739,12 @@
         const colGrid = rootStyle.getPropertyValue("--gridline").trim();
         const colMuted = rootStyle.getPropertyValue("--text-muted").trim();
         const colBaseline = rootStyle.getPropertyValue("--baseline").trim();
-        const colSeries = rootStyle.getPropertyValue("--series-1").trim();
         const colSurface = rootStyle.getPropertyValue("--surface-1").trim();
         const colText = rootStyle.getPropertyValue("--text-primary").trim();
+        // The line's color follows the selected metric (matching its map
+        // marker and its sidebar swatch) - the dashboard is fixed dark
+        // throughout now, so always the metric's dark-surface variant.
+        const colSeries = metric.colorDark;
 
         function addEl(tag, attrs) {
           const el = document.createElementNS(svgNS, tag);
@@ -812,6 +1915,24 @@
       function formatDateLong(ms) {
         return new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
       }
+
+      // Re-draw the chart when the window resizes - it's measured from its
+      // container's actual pixel size (see renderChart), so a wider or
+      // narrower window changes what it should look like. Debounced since
+      // "resize" fires continuously while dragging.
+      let resizeTimer = null;
+      window.addEventListener("resize", function () {
+        if (dailyObservations.length === 0) return;
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(renderChart, 150);
+      });
+
+      // Populate the metric list right away (all six metrics, nothing to
+      // narrow by yet) rather than leaving the sidebar empty until an org
+      // is picked. Placed last so every value it touches (leagueRows,
+      // etc.) is already initialized.
+      renderMetricList();
+      updateSymbology();
     });
   </script>
 </head>
@@ -822,72 +1943,110 @@
     <div id="sidebar">
       <h2>River Survey Dashboard</h2>
 
+      <div id="tabBar">
+        <button type="button" class="tabButton active" data-tab="map">Map</button>
+        <button type="button" class="tabButton" data-tab="league">Site league table</button>
+      </div>
+
       <label for="orgFilter">Organisation</label>
       <select id="orgFilter">
         <option value="">All organisations</option>
       </select>
 
       <div id="locationCount">Select an organisation to see its locations</div>
+
+      <label id="metricListLabel">Water quality metric</label>
+      <div id="metricList" class="metricList" role="listbox" aria-label="Water quality metric"></div>
+      <div id="symbolLegend"></div>
     </div>
 
-    <div id="viewDiv"></div>
+    <div id="mapArea">
+      <div id="mapColumn">
+        <div id="viewDiv"></div>
 
-    <div id="detailsPanel">
-      <div id="detailsPlaceholder">Click a location on the map to see its details.</div>
+        <div id="chartPanel">
+          <div id="chartPlaceholder">Click a location on the map to see its water quality trend.</div>
 
-      <div id="detailsContent" style="display: none;">
-        <h2 id="locationName"></h2>
-        <div class="orgName" id="locationOrg"></div>
-
-        <div class="statGrid">
-          <div class="statBox">
-            <div class="value" id="statSurveys"></div>
-            <div class="label">Total Surveys</div>
-          </div>
-          <div class="statBox">
-            <div class="value" id="statPhosphate"></div>
-            <div class="label">Avg Phosphate</div>
-          </div>
-          <div class="statBox">
-            <div class="value" id="statNitrate"></div>
-            <div class="label">Avg Nitrate</div>
-          </div>
-          <div class="statBox">
-            <div class="value" id="statTurbidity"></div>
-            <div class="label">Avg Turbidity</div>
+          <div class="viz-root" id="trendChartRoot" style="display: none;">
+            <div class="chartTitle" id="chartTitle">Phosphate over time</div>
+            <div class="chartWrap">
+              <svg id="trendChartSvg"></svg>
+              <div class="chartTooltip" id="chartTooltip" hidden></div>
+            </div>
+            <div class="chartEmpty" id="chartEmpty" hidden></div>
           </div>
         </div>
+      </div>
 
-        <h3>Wildlife spotted</h3>
-        <div class="wildlifeTags" id="wildlifeTags"></div>
+      <div id="detailsPanel">
+        <div id="detailsPlaceholder">Click a location on the map to see its details.</div>
 
-        <h3>Water quality over time</h3>
-        <div class="viz-root" id="trendChartRoot">
-          <div class="chartControls">
-            <label for="metricPicker">Metric</label>
-            <select id="metricPicker">
-              <option value="phosphate">Phosphate</option>
-              <option value="nitrate">Nitrate</option>
-              <option value="nitrite">Nitrite</option>
-              <option value="ammonia">Ammonia</option>
-              <option value="turbidity">Turbidity</option>
-              <option value="conductivity">Conductivity</option>
-              <option value="water_temperature">Water temperature</option>
-            </select>
+        <div id="detailsContent" style="display: none;">
+          <h2 id="locationName"></h2>
+          <div class="orgName" id="locationOrg"></div>
+
+          <div class="statGrid">
+            <div class="statBox">
+              <div class="value" id="statSurveys"></div>
+              <div class="label">Total Surveys</div>
+            </div>
+            <div class="statBox">
+              <div class="value" id="statPhosphate"></div>
+              <div class="label">Avg Phosphate</div>
+            </div>
+            <div class="statBox">
+              <div class="value" id="statNitrate"></div>
+              <div class="label">Avg Nitrate</div>
+            </div>
+            <div class="statBox">
+              <div class="value" id="statTurbidity"></div>
+              <div class="label">Avg Turbidity</div>
+            </div>
           </div>
-          <div class="chartTitle" id="chartTitle">Phosphate over time</div>
-          <div class="chartWrap">
-            <svg id="trendChartSvg"></svg>
-            <div class="chartTooltip" id="chartTooltip" hidden></div>
+
+          <h3>Wildlife spotted</h3>
+          <div class="wildlifeTags" id="wildlifeTags"></div>
+
+          <h3>Recent surveys</h3>
+          <div id="surveyCarousel">
+            <div class="surveyCarouselHeader">
+              <button type="button" id="surveyPrevBtn" class="surveyNavBtn" aria-label="Previous survey">&#8249;</button>
+              <div class="surveyCarouselPosition" id="surveyPosition" aria-live="polite"></div>
+              <button type="button" id="surveyNextBtn" class="surveyNavBtn" aria-label="Next survey">&#8250;</button>
+            </div>
+            <div class="surveyCard" id="surveyCard"></div>
           </div>
-          <div class="chartEmpty" id="chartEmpty" hidden></div>
+          <div class="surveyEmpty" id="surveyEmpty" hidden></div>
         </div>
-
-        <h3>Recent surveys</h3>
-        <div id="observationsList"></div>
       </div>
     </div>
 
+    <div id="leagueArea">
+      <div class="leagueHeader">
+        <h2>Site league table</h2>
+        <div class="leagueOrgName" id="leagueSubtitle"></div>
+      </div>
+      <div id="leagueEmpty">Select an organisation from the sidebar to see its site league table.</div>
+      <div id="leagueTableWrap" style="display: none;">
+        <div class="tableScroll">
+          <table id="leagueTable">
+            <thead>
+              <tr id="leagueTableHeadRow"></tr>
+            </thead>
+            <tbody id="leagueTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="photoLightbox" role="dialog" aria-modal="true" aria-label="Survey photo">
+    <button type="button" class="lightboxClose" id="lightboxClose" aria-label="Close">&times;</button>
+    <button type="button" class="lightboxNav" id="lightboxPrev" aria-label="Previous photo">&#8249;</button>
+    <img id="lightboxImg" src="" alt="" />
+    <button type="button" class="lightboxNav" id="lightboxNext" aria-label="Next photo">&#8250;</button>
+    <div class="lightboxCaption" id="lightboxCaption"></div>
   </div>
 </body>
 </html>
