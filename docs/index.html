@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>River Survey Dashboard</title>
-  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 
   <link rel="stylesheet" href="https://js.arcgis.com/4.31/esri/themes/dark/main.css" />
   <script src="https://js.arcgis.com/4.31/"></script>
@@ -714,6 +714,89 @@
     .sortArrow {
       color: var(--accent);
       font-size: 9px;
+    }
+
+    /* --- Small screens (phones, narrow tablets): the desktop layout is
+       three side-by-side fixed-width columns (320px sidebar + map + 320px
+       details panel) inside a non-scrolling 100%-height shell - that
+       simply doesn't fit a ~375-430px phone. Below this width the whole
+       thing stacks into one normally-scrolling column instead: sidebar,
+       then map, then chart, then details panel, each full width. Anything
+       that relied on flex-grow to fill a bounded parent height (the map,
+       the chart panel) gets an explicit viewport-relative height instead,
+       since there's no longer a bounded height to grow into. ---
+    */
+    @media (max-width: 700px) {
+      html, body {
+        height: auto;
+        min-height: 100%;
+      }
+
+      #appContainer {
+        flex-direction: column;
+        height: auto;
+        min-height: 100%;
+        width: 100%;
+      }
+
+      #sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        overflow-y: visible;
+      }
+
+      #mapArea {
+        flex-direction: column;
+        flex-grow: 0;
+        width: 100%;
+        min-width: 0;
+      }
+
+      #mapColumn {
+        flex-grow: 0;
+      }
+
+      #viewDiv {
+        flex-grow: 0;
+        height: 42vh;
+      }
+
+      #chartPanel {
+        flex: 0 0 auto;
+        height: 28vh;
+        min-height: 160px;
+      }
+
+      #detailsPanel {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        overflow-y: visible;
+      }
+
+      #leagueArea {
+        padding: 16px;
+      }
+
+      /* Bigger touch targets for the carousel's prev/next - 26px is a
+         mouse-pointer size, too small to comfortably tap. */
+      .surveyNavBtn {
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+      }
+
+      /* Less padding around the lightbox image so it actually gets to use
+         most of a phone's narrow width. */
+      #photoLightbox {
+        padding: 16px 12px;
+      }
+
+      .lightboxNav {
+        width: 40px;
+        height: 40px;
+      }
     }
   </style>
 
