@@ -189,6 +189,55 @@
       color: #fff;
     }
 
+    /* --- First-run guidance: the two ways to get started (the org
+       dropdown, or clicking a shaded area on the map) are the only things
+       that actually do anything until an organisation is picked, so this
+       calls both out explicitly rather than leaving a new visitor to
+       stumble onto them. Dismissible, and disappears on its own once an
+       organisation is selected either way. --- */
+    .onboardingBanner {
+      position: relative;
+      background: rgba(57, 135, 229, 0.12);
+      border: 1px solid rgba(57, 135, 229, 0.35);
+      border-radius: 6px;
+      padding: 10px 26px 10px 12px;
+      margin: 12px 0 4px;
+      box-sizing: border-box;
+    }
+
+    .onboardingBanner p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--text-secondary);
+    }
+
+    .onboardingDismiss {
+      position: absolute;
+      top: 2px;
+      right: 4px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 6px;
+    }
+
+    .onboardingDismiss:hover {
+      color: var(--text-primary);
+    }
+
+    @keyframes onboardingPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(57, 135, 229, 0.5); }
+      50% { box-shadow: 0 0 0 5px rgba(57, 135, 229, 0); }
+    }
+
+    .onboardingHighlight {
+      animation: onboardingPulse 1.8s ease-in-out infinite;
+    }
+
     /* --- Center: the map column (map + chart panel stacked), with the
        details panel as a full-height sidebar alongside it --- */
     #mapArea {
@@ -205,6 +254,14 @@
       flex-direction: column;
       flex-grow: 1;
       min-width: 0;
+      /* Clicking/dragging on the map (panning, clicking a feature) is a
+         mousedown+mouseup over empty space from the browser's point of
+         view, which it interprets as a text-selection drag and paints a
+         blue selection highlight across the map (and the chart panel
+         below it) unless selection is explicitly turned off here. */
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
     }
 
     #viewDiv {
@@ -702,8 +759,54 @@
       outline-offset: -2px;
     }
 
+    #leagueTable tbody tr {
+      cursor: pointer;
+    }
+
     #leagueTable tbody tr:hover {
       background: var(--surface-2);
+    }
+
+    #leagueTable tbody tr.leagueRowSelected {
+      background: rgba(57, 135, 229, 0.16);
+    }
+
+    #leagueTable tbody tr.leagueRowSelected:hover {
+      background: rgba(57, 135, 229, 0.24);
+    }
+
+    #leagueTable tbody tr:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    .leagueColCheck {
+      width: 32px;
+      text-align: center;
+    }
+
+    .leagueSelectionBar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .leagueSelectionBar button {
+      background: none;
+      border: 1px solid var(--border-strong);
+      color: var(--text-primary);
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .leagueSelectionBar button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
     }
 
     .leagueColNum {
@@ -998,6 +1101,40 @@
       const metricListEl = document.getElementById("metricList");
       const symbolLegend = document.getElementById("symbolLegend");
 
+      // --- First-run guidance: a dismissible banner plus a pulsing glow on
+      //     the org dropdown and the map itself, pointing at the two ways
+      //     to actually get started. Goes away the moment either happens -
+      //     the user picks an organisation - or the user dismisses it
+      //     directly, whichever comes first. `dismissed` guards against it
+      //     reappearing if the org selection is later cleared back to "All
+      //     organisations". ---
+      let onboardingDismissed = false;
+
+      function dismissOnboarding() {
+        if (onboardingDismissed) return;
+        onboardingDismissed = true;
+        document.getElementById("onboardingBanner").style.display = "none";
+        orgFilter.classList.remove("onboardingHighlight");
+        document.getElementById("viewDiv").classList.remove("onboardingHighlight");
+      }
+
+      document.getElementById("onboardingDismiss").addEventListener("click", dismissOnboarding);
+
+      // --- The map's point symbology / trend chart metric picker only
+      //     means anything once an organisation is selected (there's
+      //     nothing on the map to symbolize otherwise), and clutters the
+      //     sidebar for a new visitor who hasn't picked one yet - so it's
+      //     hidden until then. Also respects whichever tab is active,
+      //     since it's Map-tab-only regardless of org selection. ---
+      let currentTab = "map";
+
+      function updateMetricPanelVisibility() {
+        const visible = currentTab === "map" && !!orgFilter.value;
+        metricListLabel.style.display = visible ? "block" : "none";
+        metricListEl.style.display = visible ? "flex" : "none";
+        symbolLegend.style.display = visible ? "block" : "none";
+      }
+
       // --- The metric list: a single selector (styled like a layer list,
       //     not a dropdown) that drives BOTH the map's point symbology and
       //     the trend chart's plotted metric, so there's one source of
@@ -1119,15 +1256,14 @@
       });
 
       function switchTab(tab) {
+        currentTab = tab;
         tabButtons.forEach(function (btn) {
           btn.classList.toggle("active", btn.dataset.tab === tab);
         });
         mapArea.style.display = tab === "map" ? "flex" : "none";
         leagueArea.style.display = tab === "league" ? "block" : "none";
         locationCount.style.display = tab === "map" ? "block" : "none";
-        metricListLabel.style.display = tab === "map" ? "block" : "none";
-        metricListEl.style.display = tab === "map" ? "flex" : "none";
-        symbolLegend.style.display = tab === "map" ? "block" : "none";
+        updateMetricPanelVisibility();
 
         if (tab === "league") {
           loadLeagueTable(orgFilter.value);
@@ -1185,6 +1321,13 @@
         // different org's map, or leave it showing once every org is
         // cleared.
         clearLocationSelection();
+        // Same idea for any league-table row checkboxes from the
+        // previous org - a fresh org starts with every site shown.
+        leagueSelectedIDs = new Set();
+        // The metric picker only means anything once an org is selected -
+        // hides it again if the selection was just cleared, shows it
+        // otherwise (see the return below for the cleared case).
+        updateMetricPanelVisibility();
 
         if (!orgName) {
           organisationLayer.definitionExpression = "";
@@ -1195,6 +1338,10 @@
           view.goTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM });
           return;
         }
+
+        // An organisation was actually picked - that's the "get started"
+        // step the onboarding banner/highlight was pointing at.
+        dismissOnboarding();
 
         // Escape single quotes in case an org name ever contains one
         const escapedName = orgName.replace(/'/g, "''");
@@ -1218,15 +1365,39 @@
           });
         }
 
-        locationsLayer.definitionExpression = `organisationName = '${escapedName}'`;
         locationsLayer.visible = true;
-        updateLocationCount();
+        applyLocationFilter();
       }
 
       function updateLocationCount() {
         locationsLayer.queryFeatureCount(locationsLayer.createQuery()).then(function (count) {
           locationCount.innerText = count.toLocaleString() + " locations shown";
         });
+      }
+
+      // Escapes a value for safe embedding in a definitionExpression string
+      // literal (single quotes are the only special character SQL-style
+      // WHERE clauses here care about).
+      function escapeSql(value) {
+        return String(value).replace(/'/g, "''");
+      }
+
+      // Recomputes locationsLayer's definitionExpression from the current
+      // organisation filter plus whatever subset of sites is checked in
+      // the league table (see leagueSelectedIDs / renderLeagueTable). An
+      // empty selection means "show every site in this org" - the league
+      // table's checkboxes only ever narrow the map down, they don't have
+      // to be used at all.
+      function applyLocationFilter() {
+        const orgName = orgFilter.value;
+        if (!orgName) return;
+        let where = `organisationName = '${escapeSql(orgName)}'`;
+        if (leagueSelectedIDs.size > 0) {
+          const ids = Array.from(leagueSelectedIDs).map(function (id) { return `'${escapeSql(id)}'`; }).join(", ");
+          where += ` AND locationID IN (${ids})`;
+        }
+        locationsLayer.definitionExpression = where;
+        updateLocationCount();
       }
 
       // --- Click a location point to see its details, or click an
@@ -1334,6 +1505,11 @@
 
       let leagueRows = []; // cached site attributes for the org currently shown
       let leagueSort = { field: "locationName", direction: "asc" };
+      // locationID GUIDs checked in the league table - see applyLocationFilter.
+      // Reset whenever the organisation changes (selectOrganisation), but
+      // deliberately NOT reset by loadLeagueTable itself, so the selection
+      // survives switching away to the Map tab and back.
+      let leagueSelectedIDs = new Set();
 
       // Call with "" (e.g. "All organisations") to clear the table and show
       // the prompt instead.
@@ -1361,7 +1537,7 @@
         const query = locationsLayer.createQuery();
         query.where = `organisationName = '${escapedName}'`;
         query.returnGeometry = false;
-        query.outFields = ["locationName", "totalSurveys"].concat(METRIC_CATALOG.map(function (m) { return m.locationField; }));
+        query.outFields = ["locationID", "locationName", "totalSurveys"].concat(METRIC_CATALOG.map(function (m) { return m.locationField; }));
 
         locationsLayer.queryFeatures(query).then(function (result) {
           // A stale response for an org the user has since navigated away
@@ -1380,6 +1556,7 @@
           emptyEl.hidden = true;
           wrapEl.style.display = "block";
           renderLeagueTable();
+          updateSelectionBar();
         }).catch(function (error) {
           if (orgFilter.value !== orgName) return;
           emptyEl.textContent = "Couldn't load the league table.";
@@ -1395,6 +1572,12 @@
         const body = document.getElementById("leagueTableBody");
 
         headRow.innerHTML = "";
+
+        // Leading blank column for the row-selection checkboxes below.
+        const checkTh = document.createElement("th");
+        checkTh.className = "leagueColCheck";
+        headRow.appendChild(checkTh);
+
         LEAGUE_COLUMNS.forEach(function (col) {
           const th = document.createElement("th");
           th.className = col.type === "number" ? "leagueColNum" : "leagueColText";
@@ -1453,6 +1636,24 @@
         body.innerHTML = "";
         sorted.forEach(function (row) {
           const tr = document.createElement("tr");
+          const isSelected = leagueSelectedIDs.has(row.locationID);
+          tr.className = isSelected ? "leagueRowSelected" : "";
+          tr.tabIndex = 0;
+          tr.setAttribute("role", "checkbox");
+          tr.setAttribute("aria-checked", isSelected ? "true" : "false");
+          tr.title = "Click to " + (isSelected ? "remove this site from" : "filter the map to") + " the selected sites";
+
+          const checkTd = document.createElement("td");
+          checkTd.className = "leagueColCheck";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = isSelected;
+          checkbox.tabIndex = -1; // the row itself is the focusable/keyboard target
+          checkbox.setAttribute("aria-hidden", "true");
+          checkbox.style.pointerEvents = "none"; // clicks land on the row, never the box - avoids double-toggling
+          checkTd.appendChild(checkbox);
+          tr.appendChild(checkTd);
+
           LEAGUE_COLUMNS.forEach(function (col) {
             const td = document.createElement("td");
             td.className = col.type === "number" ? "leagueColNum" : "leagueColText";
@@ -1462,9 +1663,53 @@
               : (col.type === "number" ? formatTickValue(value) : value);
             tr.appendChild(td);
           });
+
+          // Clicking (or Enter/Space-ing) a row toggles that site in/out of
+          // leagueSelectedIDs, which narrows (or, once empty again, widens)
+          // which sites the map shows - see applyLocationFilter.
+          function toggleRowSelection() {
+            if (leagueSelectedIDs.has(row.locationID)) {
+              leagueSelectedIDs.delete(row.locationID);
+            } else {
+              leagueSelectedIDs.add(row.locationID);
+            }
+            applyLocationFilter();
+            renderLeagueTable();
+            updateSelectionBar();
+          }
+          tr.addEventListener("click", toggleRowSelection);
+          tr.addEventListener("keydown", function (evt) {
+            if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); toggleRowSelection(); }
+          });
+
           body.appendChild(tr);
         });
       }
+
+      // Shows/hides the "N of M sites shown on map - Clear selection" bar
+      // above the table based on leagueSelectedIDs.
+      function updateSelectionBar() {
+        const bar = document.getElementById("leagueSelectionBar");
+        const countEl = document.getElementById("leagueSelectionCount");
+        if (leagueSelectedIDs.size === 0) {
+          // .leagueSelectionBar sets display:flex as a class rule, which
+          // beats the [hidden] attribute's UA display:none on specificity
+          // alone - toggle display directly instead so hiding actually
+          // hides it.
+          bar.style.display = "none";
+          countEl.textContent = "";
+          return;
+        }
+        bar.style.display = "flex";
+        countEl.textContent = leagueSelectedIDs.size + " of " + leagueRows.length + " sites shown on map";
+      }
+
+      document.getElementById("leagueClearSelection").addEventListener("click", function () {
+        leagueSelectedIDs.clear();
+        applyLocationFilter();
+        renderLeagueTable();
+        updateSelectionBar();
+      });
 
       // `currentObservations` holds the full, ascending-by-date survey
       // history for whichever location is currently open - fetched once
@@ -2011,11 +2256,14 @@
       });
 
       // Populate the metric list right away (all six metrics, nothing to
-      // narrow by yet) rather than leaving the sidebar empty until an org
-      // is picked. Placed last so every value it touches (leagueRows,
-      // etc.) is already initialized.
+      // narrow by yet) so it's ready the instant an org is picked and the
+      // panel becomes visible - placed last so every value it touches
+      // (leagueRows, etc.) is already initialized.
       renderMetricList();
       updateSymbology();
+      // Hidden until an organisation is actually selected (see
+      // updateMetricPanelVisibility) - nothing to symbolize before then.
+      updateMetricPanelVisibility();
     });
   </script>
 </head>
@@ -2026,28 +2274,33 @@
     <div id="sidebar">
       <h2>River Survey Dashboard</h2>
 
+      <div id="onboardingBanner" class="onboardingBanner">
+        <button type="button" id="onboardingDismiss" class="onboardingDismiss" aria-label="Dismiss">&times;</button>
+        <p>Get started: choose an organisation from the dropdown below, or click a shaded area on the map.</p>
+      </div>
+
       <div id="tabBar">
-        <button type="button" class="tabButton active" data-tab="map">Map</button>
-        <button type="button" class="tabButton" data-tab="league">Site league table</button>
+        <button type="button" class="tabButton active" data-tab="map" title="View the map and select an organisation or site">Map</button>
+        <button type="button" class="tabButton" data-tab="league" title="Compare every site's water quality metrics in a sortable table">Site league table</button>
       </div>
 
       <label for="orgFilter">Organisation</label>
-      <select id="orgFilter">
+      <select id="orgFilter" class="onboardingHighlight" title="Select an organisation to see its sites on the map">
         <option value="">All organisations</option>
       </select>
 
       <div id="locationCount">Select an organisation to see its locations</div>
 
-      <label id="metricListLabel">Water quality metric</label>
+      <label id="metricListLabel" title="Choose which water quality metric sizes the map's points and appears in the chart below">Water quality metric</label>
       <div id="metricList" class="metricList" role="listbox" aria-label="Water quality metric"></div>
       <div id="symbolLegend"></div>
     </div>
 
     <div id="mapArea">
       <div id="mapColumn">
-        <div id="viewDiv"></div>
+        <div id="viewDiv" class="onboardingHighlight" title="Click a shaded area to select that organisation, or click a point to see site details"></div>
 
-        <div id="chartPanel">
+        <div id="chartPanel" title="Shows how the selected metric has changed over time at this site - readings from the same day are averaged into one point">
           <div id="chartPlaceholder">Click a location on the map to see its water quality trend.</div>
 
           <div class="viz-root" id="trendChartRoot" style="display: none;">
@@ -2111,8 +2364,12 @@
       </div>
       <div id="leagueEmpty">Select an organisation from the sidebar to see its site league table.</div>
       <div id="leagueTableWrap" style="display: none;">
+        <div class="leagueSelectionBar" id="leagueSelectionBar" style="display: none;">
+          <span id="leagueSelectionCount"></span>
+          <button type="button" id="leagueClearSelection">Clear selection</button>
+        </div>
         <div class="tableScroll">
-          <table id="leagueTable">
+          <table id="leagueTable" title="Click a row to filter the map down to just that site - click more rows to compare a few, or Clear selection to show them all again">
             <thead>
               <tr id="leagueTableHeadRow"></tr>
             </thead>
