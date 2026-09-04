@@ -5,14 +5,32 @@
   <title>River Survey Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 
-  <link rel="stylesheet" href="https://js.arcgis.com/4.31/esri/themes/dark/main.css" />
+  <link rel="stylesheet" href="https://js.arcgis.com/4.31/esri/themes/dark/main.css" id="arcgisThemeLink" />
   <script src="https://js.arcgis.com/4.31/"></script>
 
+  <!-- Applies a saved light-mode choice before anything paints, so the
+       page never flashes dark (the default) and then switches - the app's
+       own script (see setTheme/initTheme near the bottom) redoes this
+       properly once it's running, this is just for the first paint. -->
+  <script>
+    (function () {
+      var saved = null;
+      try { saved = localStorage.getItem("riverDashboardTheme"); } catch (e) {}
+      if (saved === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+        document.getElementById("arcgisThemeLink").href = "https://js.arcgis.com/4.31/esri/themes/light/main.css";
+      }
+    })();
+  </script>
+
   <style>
-    /* --- Dashboard-wide dark theme. One fixed palette (not tied to OS
-       preference - the whole app commits to dark, matching the chart's
-       surface/text tokens rather than the other way around) so every panel,
-       the chart, and the ArcGIS widgets all read as one consistent surface. --- */
+    /* --- Dashboard-wide theme, dark by default. Every panel, the chart,
+       and the ArcGIS widgets read from these tokens rather than fixed
+       colors, so the light variant just below is a straight swap of the
+       same names - see setTheme()/initTheme() in the script, which also
+       swaps the ArcGIS widget theme stylesheet, the basemap, and the map's
+       renderer colors (Arcade/ArcGIS symbols read plain hex, not CSS
+       custom properties, so those can't just live here). --- */
     :root {
       color-scheme: dark;
       --bg-page:        #121212;
@@ -27,6 +45,28 @@
       --gridline:       #2c2c2a;
       --baseline:       #454542;
       --accent:         #3987e5;
+    }
+
+    /* Light palette - same warm-gray undertone as the dark set above, just
+       inverted, plus a slightly darker accent blue for AA contrast against
+       a white surface. Applied via html[data-theme="light"] rather than
+       @media (prefers-color-scheme) since this is a user-picked toggle,
+       not an OS-follow. Specificity-wise this beats the :root block above
+       (element+attribute > pseudo-class) so it doesn't need !important. */
+    html[data-theme="light"] {
+      color-scheme: light;
+      --bg-page:        #f3f3f0;
+      --surface-1:      #ffffff;
+      --surface-2:      #f0f0ed;
+      --surface-3:      #e6e5e0;
+      --border:         #dcdbd5;
+      --border-strong:  #c3c2ba;
+      --text-primary:   #201f1c;
+      --text-secondary: #52504a;
+      --text-muted:     #7a7970;
+      --gridline:       #e6e5e1;
+      --baseline:       #c7c6bf;
+      --accent:         #1c67c2;
     }
 
     html, body {
@@ -58,10 +98,64 @@
       overflow-y: auto;
     }
 
+    #sidebarHeader {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
     #sidebar h2 {
       font-size: 16px;
       margin-top: 0;
       color: var(--text-primary);
+    }
+
+    /* --- Light/dark toggle, top-right of the sidebar. Shows the mode
+       you'd switch TO (sun = "go light" while dark, moon = "go dark" while
+       light), which is the common convention, but keeps a text label too
+       since an icon alone is easy to misread - see setTheme() for what
+       flipping it actually changes (page colors, the ArcGIS widget theme,
+       the basemap, and every hand-drawn map/chart color). --- */
+    .themeToggleBtn {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 9px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .themeToggleBtn:hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
+    }
+
+    #themeToggleIcon {
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    /* Imagery basemap button - added to the map itself via view.ui.add
+       (top-right), not this stylesheet's markup, so it's just sized here;
+       everything else (box, border, hover, dark/light theming) comes free
+       from the esri-widget--button/esri-widget classes set on it in the
+       script, same as the built-in zoom buttons. */
+    .imageryToggleBtn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .imageryToggleBtn.active {
+      background-color: var(--accent) !important;
     }
 
     #sidebar label {
@@ -154,14 +248,79 @@
       font-size: 12px;
     }
 
-    /* Every descendant, not just the named container classes above - the
-       widget has size-ramp-specific variants (e.g.
-       esri-legend__layer-table--size-ramp) and other modifier classes that
-       carry their own background, so naming containers one by one kept
-       missing some. This blankets all of them at once. */
+    /* #symbolLegend itself, not just its descendants - the API takes over
+       the container element it's given rather than nesting a fresh div
+       inside it, so its own outer chrome (.esri-widget's #242424
+       background, the size-ramp card's box-shadow) lands directly on this
+       ID rather than on a child, and was slipping past the descendant-only
+       rule below as the "faint box" seen behind e.g. the Phosphate ramp. */
+    #symbolLegend,
     #symbolLegend * {
       background: transparent !important;
       box-shadow: none !important;
+    }
+
+    /* --- Date range: narrows both the trend chart and the Recent surveys
+       carousel down to surveys within the picked range. Same
+       visibility rule as the metric picker above (Map tab + an
+       organisation selected) since both downstream views are Map-tab-only. --- */
+    .dateRangeRow {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dateRangeRow input[type="date"] {
+      flex: 1;
+      min-width: 0;
+      padding: 6px;
+      box-sizing: border-box;
+      background: var(--surface-2);
+      color: var(--text-primary);
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 12px;
+      /* Without this the native date-picker icon renders dark-on-dark and
+         is nearly invisible against --surface-2. */
+      color-scheme: dark;
+    }
+
+    .dateRangeSep {
+      color: var(--text-muted);
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .dateRangeClearBtn {
+      margin-top: 6px;
+      background: none;
+      border: 1px solid var(--border-strong);
+      color: var(--text-secondary);
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .dateRangeClearBtn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .checkboxRow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .checkboxRow input[type="checkbox"] {
+      margin: 0;
+      cursor: pointer;
     }
 
     /* --- Tabs: switch the main content between the map and the league table --- */
@@ -272,6 +431,24 @@
       background: var(--surface-1);
     }
 
+    /* The ArcGIS view sets tabindex on its container for keyboard
+       accessibility, so clicking a point/organisation to select it also
+       gives the map focus. #viewDiv itself never shows a browser outline,
+       but the API draws its own focus ring as a ::after pseudo-element on
+       an inner .esri-view-surface div it creates - so the fix has to
+       target that element, not #viewDiv. The exact class differs by API
+       version (--touch-none pre-5.0, plain surface at 5.0+), so both are
+       covered here. */
+    #viewDiv:focus,
+    #viewDiv:focus-visible {
+      outline: none;
+    }
+    .esri-view .esri-view-surface--touch-none:focus::after,
+    .esri-view .esri-view-surface:focus::after,
+    .esri-view .esri-view-surface:focus-visible::after {
+      outline: none !important;
+    }
+
     /* --- Right panel: location details - a flex row's children stretch to
        fill its height by default, so this runs the full height of the map
        area, chart panel included, not just alongside the map itself. --- */
@@ -338,6 +515,17 @@
     .wildlifeTag {
       background: rgba(25, 158, 112, 0.18);
       color: #6fd7a8;
+      border-radius: 12px;
+      padding: 3px 10px;
+      font-size: 12px;
+    }
+
+    /* A warning red/orange rather than wildlifeTag's green - an invasive
+       species sighting is a caution, not a nice find, so it shouldn't
+       read the same as a wildlife spot at a glance. */
+    .invasiveTag {
+      background: rgba(198, 40, 40, 0.18);
+      color: #ff8a80;
       border-radius: 12px;
       padding: 3px 10px;
       font-size: 12px;
@@ -667,9 +855,15 @@
       text-align: center;
     }
 
+    /* `position: fixed` (not absolute) so the tooltip floats in viewport
+       space above the map, details panel and everything else, instead of
+       being clipped by #chartPanel's overflow:hidden or z-index-stacked
+       under a sibling panel - see showPointAt() for the matching
+       viewport-coordinate math and edge-clamping. */
     .chartTooltip {
-      position: absolute;
+      position: fixed;
       pointer-events: none;
+      z-index: 2000;
       background: var(--text-primary);
       color: var(--surface-1);
       font-size: 11px;
@@ -678,6 +872,7 @@
       border-radius: 4px;
       transform: translate(-50%, -100%) translateY(-8px);
       white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
     }
 
     .chartTooltip .ttValue {
@@ -686,6 +881,54 @@
 
     .chartTooltip .ttDate {
       opacity: 0.75;
+    }
+
+    /* --- Comparing two sites stacks one reading-block per site inside the
+       same tooltip, separated by a hairline rather than two floating
+       tooltips. --- */
+    .chartTooltip .ttSite {
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+
+    .chartTooltip > div + div {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.25);
+    }
+
+    /* --- Chart legend: only shown when comparing 2 sites (a single site's
+       line is already fully named by the chart title). Each site keeps the
+       selected metric's own color - solid for the first site, dashed for
+       the second - so two lines of the SAME metric read as "one metric,
+       two places" rather than looking like two different metrics. --- */
+    .chartLegend {
+      display: flex;
+      gap: 14px;
+      flex-shrink: 0;
+      margin-bottom: 6px;
+    }
+
+    .chartLegendItem {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .chartLegendSwatch {
+      width: 16px;
+      height: 2px;
+      flex-shrink: 0;
+      border-radius: 1px;
+      background: var(--legend-color);
+    }
+
+    .chartLegendSwatch.dashed {
+      height: 0;
+      background: none;
+      border-top: 2px dashed var(--legend-color);
     }
 
     /* --- Site league table --- */
@@ -908,10 +1151,46 @@
       "esri/Map",
       "esri/views/MapView",
       "esri/layers/FeatureLayer",
+      "esri/layers/GraphicsLayer",
+      "esri/Graphic",
       "esri/widgets/Legend"
-    ], function (Map, MapView, FeatureLayer, Legend) {
+    ], function (Map, MapView, FeatureLayer, GraphicsLayer, Graphic, Legend) {
 
       const BASE_URL = "https://services3.arcgis.com/Bb8lfThdhugyc4G3/arcgis/rest/services/National_River_Survey_Testing_Layer/FeatureServer";
+
+      // --- Light/dark: which mode is currently active. Everything drawn
+      //     with plain CSS just reads the custom properties on
+      //     html[data-theme] directly and needs no help, but ArcGIS/Arcade
+      //     symbols and hand-rolled SVG take literal hex/rgba values, so
+      //     those live here and get rebuilt by setTheme() whenever the
+      //     toggle flips. Starts "dark" and is corrected by initTheme()
+      //     (reading the saved choice, if any) before anything is drawn. ---
+      let currentTheme = "dark";
+
+      // Independent of light/dark: whether the imagery basemap is on
+      // instead of the plain gray reference one for the current theme -
+      // toggled by imageryToggleBtn, a button on the map itself (see
+      // applyBasemap() and the view.ui.add() call, both just after the
+      // view is constructed). Doesn't get its own light/dark variant since
+      // satellite imagery isn't really "dark" or "light" to begin with.
+      let useImageryBasemap = false;
+
+      const THEME_MAP_COLORS = {
+        dark: {
+          organisationOutline: [195, 194, 183, 0.45],
+          allSitesMarker: "#8f8d86",
+          markerOutline: "#ffffff"
+        },
+        light: {
+          // Same hues, re-weighted for a pale basemap: a near-white outline
+          // at low opacity (the dark set's look) would all but disappear
+          // against light gray canvas, so the organisation boundary and
+          // every point's outline go dark instead of light here.
+          organisationOutline: [90, 88, 80, 0.55],
+          allSitesMarker: "#8f8d86",
+          markerOutline: "#2a2a27"
+        }
+      };
 
       // Styled here in code rather than relying on the renderer saved in
       // ArcGIS Online, so the look is guaranteed regardless of what's set
@@ -922,32 +1201,101 @@
       // rather than removed entirely, since a transparent fill (unlike no
       // fill symbol at all) still lets clicks on the polygon's interior
       // register as hits, not just clicks on the outline itself.
-      const organisationRenderer = {
-        type: "simple",
-        symbol: {
-          type: "simple-fill",
-          color: [0, 0, 0, 0],
-          outline: {
-            color: "#3987e5",
-            width: 2
+      function buildOrganisationRenderer(theme) {
+        return {
+          type: "simple",
+          symbol: {
+            type: "simple-fill",
+            color: [0, 0, 0, 0],
+            outline: {
+              // A quiet neutral gray at reduced opacity rather than the
+              // bright accent blue used for selection/highlight elsewhere
+              // - the boundary should read as background context, not a
+              // call to action.
+              color: THEME_MAP_COLORS[theme].organisationOutline,
+              width: 1.2
+            }
           }
-        }
-      };
+        };
+      }
 
       const MARKER_COLOR = "#e8590c";
+
+      // Each metric's color for whichever theme is active - `colorDark` on
+      // the dark surface, `colorLight` on the light one. Both variants
+      // live on METRIC_CATALOG below; this is the one place that picks
+      // between them; every place that shows a metric's color (sidebar
+      // swatches, map symbology, survey cards, the chart) reads it through
+      // here rather than a hardcoded field name.
+      function metricColor(m) {
+        return currentTheme === "light" ? m.colorLight : m.colorDark;
+      }
+
+      // --- Fixed colors for the map's selection rings and (when comparing
+      //     two sites) the chart's two lines and its legend. Deliberately
+      //     outside every hue already used by METRIC_CATALOG (blue/orange/
+      //     teal/amber/pink/green) so a selection or comparison line never
+      //     looks like it's telling you about a different metric. Index 1
+      //     (cyan) is the everyday "this is selected" color - used both for
+      //     a single selected site and for the second site in a comparison;
+      //     index 0 (violet) only appears for the first site once a second
+      //     one is added, so two sites read as clearly different places
+      //     rather than two of the same ring. See updateCompareHighlights
+      //     for exactly how the index is picked. ---
+      const COMPARE_SITE_COLORS = [
+        { light: "#6d3fc9", dark: "#9b6cf5" },
+        { light: "#0e8fa3", dark: "#3fd0e0" }
+      ];
+
+      function compareColor(index) {
+        const c = COMPARE_SITE_COLORS[index];
+        return currentTheme === "light" ? c.light : c.dark;
+      }
+
+      // ArcGIS symbol colors take an [r, g, b, a] array rather than a CSS
+      // color string - this is the one spot that needs to turn a hex
+      // string into one, for the compare-ring symbols below.
+      function hexToRgbArray(hex, alpha) {
+        const clean = hex.replace("#", "");
+        return [
+          parseInt(clean.substring(0, 2), 16),
+          parseInt(clean.substring(2, 4), 16),
+          parseInt(clean.substring(4, 6), 16),
+          alpha
+        ];
+      }
+
+      // A soft colored ring around a selected site's point - deliberately
+      // bigger than the largest a data point ever draws (size 28, see
+      // buildLocationsRenderer) so it reads as a halo around the dot
+      // rather than competing with it. Used for every selected site, via
+      // updateCompareHighlights - a lone selection and each site in a
+      // 2-site comparison all draw one of these, just with a different
+      // compareColor() index.
+      function buildCompareRingSymbol(color) {
+        return {
+          type: "simple-marker",
+          style: "circle",
+          color: hexToRgbArray(color, 0.18),
+          size: 34,
+          outline: { color: color, width: 2.5 }
+        };
+      }
 
       // The single source of truth for every water quality metric the app
       // shows anywhere - the sidebar's metric list, the map's point
       // symbology, the trend chart, and the league table columns.
-      // `locationField` is this metric's per-site average on the
-      // locations layer (drives symbology + league table); `observationField`
-      // is its raw per-survey field on the observations table (drives the
-      // trend chart). Colors are the dataviz palette's fixed categorical
+      // `locationField` is this metric's name in the live, date-filtered
+      // per-site aggregate (`leagueRows` - see recomputeLeagueRows), which
+      // drives symbology + the league table; `observationField` is its
+      // raw per-survey field on the observations table, which drives the
+      // trend chart. Colors are the dataviz palette's fixed categorical
       // order - kept in that order so the set stays colorblind-safe however
-      // many of the six an org ends up collecting. The dashboard is fixed
-      // dark throughout, so only `colorDark` (each metric's dark-surface
-      // variant) is used anywhere - `colorLight` is kept in case a light
-      // theme ever comes back, but nothing currently reads it.
+      // many of the six an org ends up collecting. `colorDark`/`colorLight`
+      // are each metric's variant for the dark/light surface respectively -
+      // metricColor() picks between them by currentTheme, and every place
+      // that shows a metric's color reads it through that function rather
+      // than one of these fields directly.
       const METRIC_CATALOG = [
         { key: "phosphate", label: "Phosphate", locationField: "phosphateAverage", observationField: "phosphate", colorLight: "#2a78d6", colorDark: "#3987e5" },
         { key: "nitrate", label: "Nitrate", locationField: "nitrateAverage", observationField: "nitrate", colorLight: "#eb6834", colorDark: "#d95926" },
@@ -957,24 +1305,93 @@
         { key: "conductivity", label: "Conductivity", locationField: "conductivityAverage", observationField: "conductivity", colorLight: "#008300", colorDark: "#008300" }
       ];
 
-      // Builds the locations renderer. With no field (or a degenerate
-      // domain - every visible site sharing the same value) every point is
-      // a fixed size; otherwise a `size` visual variable scales each point
-      // between minSize and maxSize across the field's min/max for
-      // whatever's currently on screen.
-      function buildLocationsRenderer(field, minVal, maxVal, color) {
+      // Every wildlife species the app tags in the details panel, and its
+      // per-survey field on the Observations table (each holds "Yes" when
+      // that survey recorded a sighting, otherwise null/absent) - drives
+      // updateWildlifeTagsForPrimary, which tallies how many of the
+      // primary site's surveys within the current date range spotted each
+      // one. Field names here don't follow one consistent naming pattern
+      // (e.g. "bat" singular vs. the others), so they're spelled out
+      // exactly as they exist on the service rather than derived.
+      const WILDLIFE_FIELDS = [
+        { observationField: "wildlife_otter", label: "Otter" },
+        { observationField: "wildlife_dipper", label: "Dipper" },
+        { observationField: "wildlife_water_vole", label: "Water Vole" },
+        { observationField: "wildlife_kingfisher", label: "Kingfisher" },
+        { observationField: "wildlife_dragonflies_damselflies", label: "Dragonflies/Damselflies" },
+        { observationField: "wildlife_heron", label: "Heron" },
+        { observationField: "wildlife_fish", label: "Fish" },
+        { observationField: "wildlife_grey_wagtail", label: "Grey Wagtail" },
+        { observationField: "wildlife_bat", label: "Bats" },
+        { observationField: "wildlife_mayflies_caddisflies", label: "Mayflies/Caddisflies" }
+      ];
+
+      // Same idea as WILDLIFE_FIELDS, for the "Invasive species" section -
+      // each holds "Yes" per survey when that invasive plant was recorded.
+      // invasive_plants_other (free text) exists on the service but isn't
+      // surfaced here, same as wildlife_other - a free-text field can't be
+      // tallied as a per-species count the way these fixed ones are.
+      const INVASIVE_PLANT_FIELDS = [
+        { observationField: "invasive_plants_himalayan_balsam", label: "Himalayan Balsam" },
+        { observationField: "invasive_plants_japanese_knotweed", label: "Japanese Knotweed" },
+        { observationField: "invasive_plants_giant_hogweed", label: "Giant Hogweed" },
+        { observationField: "invasive_plants_skunk_cabbage", label: "Skunk Cabbage" },
+        { observationField: "invasive_plants_curly_waterweed", label: "Curly Waterweed" },
+        { observationField: "invasive_plants_floating_pennywort", label: "Floating Pennywort" }
+      ];
+
+      // Escapes a value for safe embedding inside a single-quoted Arcade
+      // string literal (single quotes are the only special character
+      // Arcade string literals care about here) - mirrors escapeSql below,
+      // just for Arcade instead of the REST API's WHERE clauses.
+      function escapeArcadeString(value) {
+        return String(value).replace(/'/g, "\\'");
+      }
+
+      // --- Builds an Arcade Decode() expression mapping each site's
+      //     locationID to its live value for `field` in `rows` (the
+      //     current `leagueRows`) - used as a size visual variable's
+      //     valueExpression instead of a literal field name, since the
+      //     values being sized by are computed client-side from
+      //     date-filtered observations rather than stored on the
+      //     locations layer itself. A site with no reading for this
+      //     metric in range is simply left out of the Decode cases, so it
+      //     falls through to Decode's default (null) - the base symbol's
+      //     fixed size handles a null result the same as it always has. ---
+      function buildArcadeDecodeExpression(field, rows) {
+        const cases = [];
+        rows.forEach(function (row) {
+          const value = row[field];
+          if (value === null || value === undefined) return;
+          cases.push("'" + escapeArcadeString(row.locationID) + "'");
+          cases.push(String(value));
+        });
+        return "Decode($feature.locationID, " + cases.join(", ") + ", null)";
+      }
+
+      // Builds the locations renderer. With no field, no rows, or a
+      // degenerate domain (every visible site sharing the same value)
+      // every point is a fixed size; otherwise a `size` visual variable -
+      // driven by the Arcade Decode expression above, not a literal field,
+      // since the value being sized by is a live client-side computation -
+      // scales each point between minSize and maxSize across the field's
+      // min/max for whatever's currently on screen. The ArcGIS Legend
+      // widget renders a normal size ramp for an Arcade-expression visual
+      // variable exactly as it would for a field-based one, so switching
+      // to this didn't cost the automatic legend.
+      function buildLocationsRenderer(field, rows, minVal, maxVal, color) {
         const symbol = {
           type: "simple-marker",
           style: "circle",
           color: color || MARKER_COLOR,
           size: 8,
           outline: {
-            color: "#ffffff",
+            color: THEME_MAP_COLORS[currentTheme].markerOutline,
             width: 1
           }
         };
 
-        if (!field || minVal === null || minVal === undefined || maxVal === null || maxVal === undefined || minVal === maxVal) {
+        if (!field || !rows || rows.length === 0 || minVal === null || minVal === undefined || maxVal === null || maxVal === undefined || minVal === maxVal) {
           return { type: "simple", symbol: symbol };
         }
 
@@ -983,7 +1400,7 @@
           symbol: symbol,
           visualVariables: [{
             type: "size",
-            field: field,
+            valueExpression: buildArcadeDecodeExpression(field, rows),
             minDataValue: minVal,
             maxDataValue: maxVal,
             minSize: 6,
@@ -998,19 +1415,53 @@
         url: BASE_URL + "/0",
         outFields: ["*"],
         popupEnabled: false, // we're building our own details panel instead
-        renderer: organisationRenderer
+        renderer: buildOrganisationRenderer(currentTheme)
       });
 
       // The map layer - shows survey locations as points.
       // Hidden until an organisation has been selected (via the dropdown
       // or by clicking its polygon on the map), at which point it's
-      // filtered down to that org's locations and shown.
+      // filtered down to that org's locations that have at least one
+      // survey in the current date range (see applyLocationFilter) and
+      // shown, sized/colored by whichever metric is picked.
       const locationsLayer = new FeatureLayer({
         url: BASE_URL + "/1",
         outFields: ["*"],
         popupEnabled: false, // we're building our own details panel instead
         visible: false,
-        renderer: buildLocationsRenderer(null, null, null)
+        renderer: buildLocationsRenderer(null, null, null, null)
+      });
+
+      // --- "All site locations" reference layer: every site belonging to
+      //     the selected organisation, survey or no survey, as small
+      //     uniform gray dots - purely a visual reference (not clickable;
+      //     the click handler below only ever looks for a hit on
+      //     `locationsLayer`) that the user can turn on/off, since
+      //     `locationsLayer` above now hides any site with zero surveys in
+      //     range. Drawn BELOW `locationsLayer` in the map's layer order
+      //     so a surveyed site shows its normal colored/sized dot on top
+      //     of this layer's small gray one underneath, rather than the two
+      //     competing. Hidden by default; toggled via the sidebar
+      //     checkbox - see showAllSitesToggle. ---
+      function buildAllSitesRenderer(theme) {
+        const t = THEME_MAP_COLORS[theme];
+        return {
+          type: "simple",
+          symbol: {
+            type: "simple-marker",
+            style: "circle",
+            color: t.allSitesMarker,
+            size: 5,
+            outline: { color: t.markerOutline, width: 0.5 }
+          }
+        };
+      }
+      const allSitesLayer = new FeatureLayer({
+        url: BASE_URL + "/1",
+        outFields: ["locationID", "locationName", "organisationName"],
+        popupEnabled: false,
+        visible: false,
+        renderer: buildAllSitesRenderer(currentTheme)
       });
 
       // Used only for querying observation history - never added to the map
@@ -1018,10 +1469,31 @@
         url: BASE_URL + "/2"
       });
 
+      const BASEMAP_BY_THEME = { dark: "dark-gray-vector", light: "gray-vector" };
+
+      // Holds a selection ring (see buildCompareRingSymbol) for every
+      // currently selected site, 1 or 2 - a plain GraphicsLayer rather
+      // than the built-in view.highlight() glow, since that only supports
+      // one highlight color per view and a 2-site comparison needs two.
+      // Sits above locationsLayer so a ring actually surrounds its point
+      // instead of being drawn underneath it.
+      const compareRingLayer = new GraphicsLayer();
+
       const map = new Map({
-        basemap: "dark-gray-vector",
-        layers: [organisationLayer, locationsLayer]
+        basemap: BASEMAP_BY_THEME[currentTheme],
+        layers: [organisationLayer, allSitesLayer, locationsLayer, compareRingLayer]
       });
+
+      // Sets the map's basemap from the two independent choices that
+      // affect it: the imagery toggle overrides the theme's basemap
+      // entirely when on ("hybrid" = imagery with road/place labels, more
+      // useful for a river survey map than plain unlabeled satellite);
+      // otherwise it's whichever gray reference basemap matches the
+      // current theme. Called by setTheme() (a theme change) and by the
+      // imagery button's own click handler below.
+      function applyBasemap() {
+        map.basemap = useImageryBasemap ? "hybrid" : BASEMAP_BY_THEME[currentTheme];
+      }
 
       // Kept as constants so we can return to this starting view later
       // (e.g. when the organisation selection is cleared).
@@ -1035,42 +1507,72 @@
         zoom: INITIAL_ZOOM
       });
 
-      // How the selected location's point glows on the map - a soft halo
-      // in the same accent blue used for the active tab/metric elsewhere,
-      // so "selected" reads consistently whether you're looking at the
-      // sidebar or the map itself.
-      view.highlightOptions = {
-        color: "#3987e5",
-        haloOpacity: 1,
-        fillOpacity: 0.25
-      };
+      // --- Imagery basemap toggle, as a button on the map itself (top
+      //     right, an empty corner - zoom sits top-left by default) rather
+      //     than a sidebar checkbox, matching where a basemap control
+      //     usually lives on an ArcGIS map. Built as a plain element with
+      //     Esri's own widget-button classes instead of one of the API's
+      //     basemap widgets, since those assume toggling between two fixed
+      //     basemaps - this one has to cooperate with applyBasemap()'s
+      //     other input (the light/dark theme), which a fixed pair can't
+      //     express. Picking up esri-widget--button/esri-widget/
+      //     esri-interactive means it re-themes for free whenever setTheme
+      //     swaps the ArcGIS stylesheet, same as the built-in zoom
+      //     buttons. ---
+      const imageryToggleBtn = document.createElement("button");
+      imageryToggleBtn.type = "button";
+      imageryToggleBtn.className = "esri-widget--button esri-widget esri-interactive imageryToggleBtn";
+      imageryToggleBtn.setAttribute("aria-pressed", "false");
+      imageryToggleBtn.title = "Show satellite imagery basemap";
+      imageryToggleBtn.innerHTML = '<span aria-hidden="true">\u{1F6F0}\u{FE0F}</span>';
+      view.ui.add(imageryToggleBtn, "top-right");
 
-      // Resolved once, reused for every highlight - `view.whenLayerView`
-      // is only needed the first time.
-      const locationsLayerViewPromise = view.whenLayerView(locationsLayer);
-      let highlightHandle = null;
+      imageryToggleBtn.addEventListener("click", function () {
+        useImageryBasemap = !useImageryBasemap;
+        applyBasemap();
+        imageryToggleBtn.classList.toggle("active", useImageryBasemap);
+        imageryToggleBtn.setAttribute("aria-pressed", String(useImageryBasemap));
+        imageryToggleBtn.title = useImageryBasemap
+          ? "Switch back to the reference basemap"
+          : "Show satellite imagery basemap";
+      });
 
-      // Removes the glow from whichever location is currently highlighted,
-      // if any - called before highlighting a new one, and whenever the
-      // organisation selection changes (a highlight left over from another
-      // org's site would be pointing at a now-hidden or filtered-out point).
-      function clearLocationHighlight() {
-        if (highlightHandle) {
-          highlightHandle.remove();
-          highlightHandle = null;
-        }
+      // --- Keeps the map's highlight rings in sync with `selectedSites`
+      //     (see below, near the observation-fetching code). Every
+      //     selected site gets its own colored ring graphic from
+      //     compareColor()/buildCompareRingSymbol on compareRingLayer -
+      //     a single selection uses the same cyan (index 1) as the second
+      //     site in a comparison, rather than a separate color of its own,
+      //     so "selected" reads the same whether it's the only site chosen
+      //     or the second of two; a real 2-site comparison keeps the first
+      //     site's own violet (index 0) alongside it. Clears every
+      //     previous ring first (one left over from a site just
+      //     ctrl/cmd-clicked back off would otherwise linger). Called
+      //     whenever the organisation selection changes too, via
+      //     clearLocationSelection, and by setTheme() so the rings stay in
+      //     the current theme's colors. ---
+      function updateCompareHighlights() {
+        compareRingLayer.removeAll();
+        selectedSites.forEach(function (s, i) {
+          const colorIndex = selectedSites.length === 1 ? 1 : i;
+          compareRingLayer.add(new Graphic({
+            geometry: s.graphic.geometry,
+            symbol: buildCompareRingSymbol(compareColor(colorIndex))
+          }));
+        });
       }
 
       // --- Resets the details panel and chart panel back to their
-      //     "nothing selected" placeholders, and drops the map glow - used
-      //     whenever the currently-open location stops being relevant, i.e.
-      //     switching to a different organisation or back to "All
-      //     organisations" (see selectOrganisation). Without this the
-      //     panels kept showing the previous org's site after switching,
-      //     which no longer made sense once its point wasn't even on
-      //     screen any more. ---
+      //     "nothing selected" placeholders, and drops the map ring(s) -
+      //     used whenever the currently-open location stops being
+      //     relevant, i.e. switching to a different organisation or back
+      //     to "All organisations" (see selectOrganisation). Without this
+      //     the panels kept showing the previous org's site after
+      //     switching, which no longer made sense once its point wasn't
+      //     even on screen any more. ---
       function clearLocationSelection() {
-        clearLocationHighlight();
+        compareRingLayer.removeAll();
+        selectedSites = [];
 
         document.getElementById("detailsContent").style.display = "none";
         document.getElementById("detailsPlaceholder").style.display = "block";
@@ -1078,8 +1580,6 @@
         document.getElementById("trendChartRoot").style.display = "none";
         document.getElementById("chartPlaceholder").style.display = "block";
 
-        currentObservations = [];
-        dailyObservations = [];
         recentObservations = [];
         surveyIndex = 0;
         renderSurveyCard();
@@ -1100,6 +1600,120 @@
       const metricListLabel = document.getElementById("metricListLabel");
       const metricListEl = document.getElementById("metricList");
       const symbolLegend = document.getElementById("symbolLegend");
+      const dateRangeLabel = document.getElementById("dateRangeLabel");
+      const dateRangeRow = document.getElementById("dateRangeRow");
+      const dateFromInput = document.getElementById("dateFrom");
+      const dateToInput = document.getElementById("dateTo");
+      const dateRangeClearBtn = document.getElementById("dateRangeClear");
+      const showAllSitesRow = document.getElementById("showAllSitesRow");
+      const showAllSitesToggle = document.getElementById("showAllSitesToggle");
+
+      showAllSitesToggle.addEventListener("change", function () {
+        allSitesLayer.visible = showAllSitesToggle.checked;
+      });
+
+      // --- Light/dark toggle. setTheme() (defined below, once
+      //     updateSymbology/renderMetricList/renderSurveyCard/renderChart
+      //     all exist) is the one place that actually applies a theme;
+      //     this just wires the button to it and remembers the choice. ---
+      const themeToggleBtn = document.getElementById("themeToggle");
+      const themeToggleIcon = document.getElementById("themeToggleIcon");
+      const themeToggleLabel = document.getElementById("themeToggleLabel");
+
+      themeToggleBtn.addEventListener("click", function () {
+        setTheme(currentTheme === "light" ? "dark" : "light");
+      });
+
+      // --- Date range: narrows the trend chart and the Recent surveys
+      //     carousel down to surveys within [dateRangeFrom, dateRangeTo]
+      //     (each a ms timestamp, start/end-of-day so the picked days are
+      //     fully inclusive - see parseDateInputStart/End). Either can be
+      //     null, meaning unbounded on that side. Applies across whichever
+      //     site(s) are selected and persists across organisation switches
+      //     - it's a time window, not something tied to one org. ---
+      let dateRangeFrom = null;
+      let dateRangeTo = null;
+
+      // Never lets "From" be picked after "To" (or vice versa) at the
+      // picker level, and never lets "To" be a future date - readings
+      // don't exist yet for those.
+      const TODAY_STR = new Date().toISOString().slice(0, 10);
+      dateToInput.max = TODAY_STR;
+
+      function parseDateInputStart(value) {
+        if (!value) return null;
+        const parts = value.split("-").map(Number);
+        return new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0).getTime();
+      }
+
+      function parseDateInputEnd(value) {
+        if (!value) return null;
+        const parts = value.split("-").map(Number);
+        return new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999).getTime();
+      }
+
+      function isWithinDateRange(ms) {
+        if (ms === null || ms === undefined) return false;
+        if (dateRangeFrom !== null && ms < dateRangeFrom) return false;
+        if (dateRangeTo !== null && ms > dateRangeTo) return false;
+        return true;
+      }
+
+      // Recomputes the primary site's carousel data and re-draws the chart
+      // for whichever site(s) are selected - called whenever the date
+      // range changes. A no-op with nothing selected.
+      function refreshForDateRange() {
+        // League table / map symbology / a selected site's stat boxes all
+        // derive from `leagueRows` (see recomputeLeagueRows, further down
+        // near the league table code) - recompute it first, purely
+        // client-side, no requery, so everything downstream picks up the
+        // new range together. A no-op with no organisation selected yet.
+        if (orgSiteList.length > 0) {
+          recomputeLeagueRows();
+          updateAvailableMetrics(); // re-renders the metric list + map symbology
+          renderLeagueTable();
+          applyLocationFilter(); // which sites have a survey in range can change too
+        }
+
+        if (selectedSites.length === 0) return;
+        const primary = selectedSites[selectedSites.length - 1];
+        recentObservations = computeRecentObservations(primary.locationID);
+        surveyIndex = 0;
+        renderSurveyCard();
+        renderChart();
+        updateStatsForPrimary(primary.locationID);
+        updateWildlifeTagsForPrimary(primary.locationID);
+        updateInvasiveTagsForPrimary(primary.locationID);
+      }
+
+      // Shown only while the date range picker itself is shown (Map tab +
+      // an org selected) AND at least one of the two dates is actually set
+      // - combines both conditions in one place so updateDateRange and
+      // updateMetricPanelVisibility never have to agree on it separately.
+      function updateDateRangeClearVisibility() {
+        const panelVisible = currentTab === "map" && !!orgFilter.value;
+        dateRangeClearBtn.hidden = !panelVisible || (!dateFromInput.value && !dateToInput.value);
+      }
+
+      function updateDateRange() {
+        dateFromInput.max = dateToInput.value || TODAY_STR;
+        dateToInput.min = dateFromInput.value || "";
+        dateRangeFrom = parseDateInputStart(dateFromInput.value);
+        dateRangeTo = parseDateInputEnd(dateToInput.value);
+        updateDateRangeClearVisibility();
+        refreshForDateRange();
+      }
+
+      dateFromInput.addEventListener("change", updateDateRange);
+      dateToInput.addEventListener("change", updateDateRange);
+      dateRangeClearBtn.addEventListener("click", function () {
+        dateFromInput.value = "";
+        dateToInput.value = "";
+        dateToInput.max = TODAY_STR;
+        dateFromInput.max = TODAY_STR;
+        dateToInput.min = "";
+        updateDateRange();
+      });
 
       // --- First-run guidance: a dismissible banner plus a pulsing glow on
       //     the org dropdown and the map itself, pointing at the two ways
@@ -1133,6 +1747,10 @@
         metricListLabel.style.display = visible ? "block" : "none";
         metricListEl.style.display = visible ? "flex" : "none";
         symbolLegend.style.display = visible ? "block" : "none";
+        dateRangeLabel.style.display = visible ? "block" : "none";
+        dateRangeRow.style.display = visible ? "flex" : "none";
+        showAllSitesRow.style.display = visible ? "flex" : "none";
+        updateDateRangeClearVisibility();
       }
 
       // --- The metric list: a single selector (styled like a layer list,
@@ -1190,7 +1808,7 @@
 
           const swatch = document.createElement("span");
           swatch.className = "metricSwatch";
-          swatch.style.background = m.colorDark;
+          swatch.style.background = metricColor(m);
 
           const label = document.createElement("span");
           label.textContent = m.label;
@@ -1210,7 +1828,7 @@
         updateSymbology();
         // A location's chart may already be open - keep it in sync with
         // the newly picked metric rather than waiting for the next click.
-        if (currentObservations.length > 0) renderChart();
+        if (selectedSites.length > 0) renderChart();
       }
 
       // --- Size the location points by whichever metric is selected,
@@ -1218,14 +1836,17 @@
       //     selected organisation's sites (or every site when none is
       //     selected) - not the whole layer, so the size range stays
       //     meaningful for what's actually visible. Reads from the
-      //     already-cached `leagueRows` rather than a fresh query. Shows
+      //     already-computed `leagueRows` (see recomputeLeagueRows) rather
+      //     than a fresh query - it's a live, date-filtered aggregate, so
+      //     the sizing (via the Arcade Decode expression in
+      //     buildLocationsRenderer) moves with the date range too. Shows
       //     the scale through the ArcGIS Legend widget rather than a
       //     hand-written sentence. ---
       function updateSymbology() {
         const metric = METRIC_CATALOG.find(function (m) { return m.key === selectedMetricKey; });
 
         if (!metric) {
-          locationsLayer.renderer = buildLocationsRenderer(null, null, null, MARKER_COLOR);
+          locationsLayer.renderer = buildLocationsRenderer(null, null, null, null, MARKER_COLOR);
           legend.layerInfos = [];
           return;
         }
@@ -1237,9 +1858,65 @@
         const minVal = values.length ? Math.min.apply(null, values) : null;
         const maxVal = values.length ? Math.max.apply(null, values) : null;
 
-        locationsLayer.renderer = buildLocationsRenderer(metric.locationField, minVal, maxVal, metric.colorDark);
+        locationsLayer.renderer = buildLocationsRenderer(metric.locationField, leagueRows, minVal, maxVal, metricColor(metric));
         locationsLayer.title = metric.label;
         legend.layerInfos = [{ layer: locationsLayer, title: metric.label }];
+      }
+
+      // --- Applies `theme` ("dark"/"light") everywhere it needs to be set
+      //     by hand: the html[data-theme] attribute (which flips every CSS
+      //     custom property across the whole page on its own), the ArcGIS
+      //     widget theme stylesheet, the basemap, and every map renderer
+      //     built from THEME_MAP_COLORS/metricColor(). Also re-runs the
+      //     few render functions that bake a color into markup/an SVG
+      //     attribute at draw time rather than leaving it as a live CSS
+      //     variable, so anything already on screen updates immediately
+      //     instead of waiting for its next natural re-render. Called by
+      //     the toggle button and once at startup (see initTheme). ---
+      function setTheme(theme) {
+        currentTheme = theme;
+        document.documentElement.setAttribute("data-theme", theme);
+
+        try {
+          localStorage.setItem("riverDashboardTheme", theme);
+        } catch (e) {
+          // Private browsing / storage disabled - the toggle still works
+          // for the rest of this visit, it just won't be remembered.
+        }
+
+        document.getElementById("arcgisThemeLink").href =
+          "https://js.arcgis.com/4.31/esri/themes/" + theme + "/main.css";
+
+        applyBasemap();
+        organisationLayer.renderer = buildOrganisationRenderer(theme);
+        allSitesLayer.renderer = buildAllSitesRenderer(theme);
+
+        const isLight = theme === "light";
+        themeToggleBtn.setAttribute("aria-pressed", String(isLight));
+        themeToggleBtn.title = isLight ? "Switch to dark mode" : "Switch to light mode";
+        themeToggleIcon.textContent = isLight ? "\u{1F319}" : "☀";
+        themeToggleLabel.textContent = isLight ? "Dark mode" : "Light mode";
+
+        renderMetricList();
+        updateSymbology();
+        renderSurveyCard();
+        if (selectedSites.length > 0) renderChart();
+        // Re-colors the compare rings (if two sites are selected) to the
+        // new theme's compareColor() variants - a no-op otherwise.
+        updateCompareHighlights();
+      }
+
+      // Restores the last theme the user picked (if any). Called near the
+      // bottom of this script, after every function setTheme() depends on
+      // has been defined.
+      function initTheme() {
+        let saved = null;
+        try {
+          saved = localStorage.getItem("riverDashboardTheme");
+        } catch (e) {
+          // ignore - falls through to the default below
+        }
+        setTheme(saved === "light" ? "light" : "dark");
       }
 
       // --- Tabs: Map (the existing view) and Site league table share the
@@ -1273,7 +1950,7 @@
         // renderChart), so if it was resized while the map tab was
         // hidden (display:none doesn't get a size), redraw it now that
         // it's visible again - but only if a location is actually open.
-        if (tab === "map" && dailyObservations.length > 0) {
+        if (tab === "map" && selectedSites.length > 0) {
           renderChart();
         }
       }
@@ -1333,6 +2010,10 @@
           organisationLayer.definitionExpression = "";
           locationsLayer.visible = false;
           locationsLayer.definitionExpression = "";
+          // "1 = 0" rather than "" - an empty expression means "no filter
+          // at all", which would show every site from every organisation
+          // if the reference layer's toggle happens to be on.
+          allSitesLayer.definitionExpression = "1 = 0";
           locationCount.innerText = "Select an organisation to see its locations";
 
           view.goTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM });
@@ -1365,6 +2046,11 @@
           });
         }
 
+        // The reference layer shows every one of the org's sites - no
+        // survey-count or league-table-checkbox narrowing, unlike
+        // locationsLayer below (see applyLocationFilter).
+        allSitesLayer.definitionExpression = `organisationName = '${escapeSql(orgName)}'`;
+
         locationsLayer.visible = true;
         applyLocationFilter();
       }
@@ -1392,6 +2078,23 @@
         const orgName = orgFilter.value;
         if (!orgName) return;
         let where = `organisationName = '${escapeSql(orgName)}'`;
+
+        // Only show sites with at least one survey in the current date
+        // range - see recomputeLeagueRows. A site with none still exists
+        // on the "All site locations" reference layer (allSitesLayer) if
+        // the user turns that on.
+        const surveyedIDs = leagueRows.filter(function (r) { return r.totalSurveys > 0; }).map(function (r) { return r.locationID; });
+        if (surveyedIDs.length === 0) {
+          // Nothing has a survey yet in range (or the org's data is still
+          // loading - see loadLeagueTable/recomputeLeagueRows) - show
+          // nothing rather than every site, which would defeat the point
+          // of this filter.
+          where += ` AND 1 = 0`;
+        } else {
+          const surveyedList = surveyedIDs.map(function (id) { return `'${escapeSql(id)}'`; }).join(", ");
+          where += ` AND locationID IN (${surveyedList})`;
+        }
+
         if (leagueSelectedIDs.size > 0) {
           const ids = Array.from(leagueSelectedIDs).map(function (id) { return `'${escapeSql(id)}'`; }).join(", ");
           where += ` AND locationID IN (${ids})`;
@@ -1401,7 +2104,9 @@
       }
 
       // --- Click a location point to see its details, or click an
-      //     organisation polygon to select/zoom into that organisation ---
+      //     organisation polygon to select/zoom into that organisation.
+      //     Ctrl/Cmd-click a point instead of a plain click to compare it
+      //     against whatever's already selected - see handleLocationClick. ---
       view.on("click", function (event) {
         view.hitTest(event).then(function (response) {
           const locationResult = response.results.find(function (r) {
@@ -1409,7 +2114,8 @@
           });
 
           if (locationResult) {
-            showLocationDetails(locationResult.graphic);
+            const addToCompare = !!(event.native && (event.native.ctrlKey || event.native.metaKey));
+            handleLocationClick(locationResult.graphic, addToCompare);
             return;
           }
 
@@ -1424,17 +2130,41 @@
         });
       });
 
+      // --- Handles a click on a location point. A plain click always
+      //     replaces the whole selection with just this one site (the
+      //     original single-select behaviour). Ctrl/Cmd-click instead
+      //     toggles this site into or out of the comparison, up to 2 sites
+      //     at once - clicking a third site while 2 are already selected
+      //     drops the oldest of the two to make room. Whichever site was
+      //     clicked most recently is "primary" (last in `selectedSites`)
+      //     and drives the details panel/survey carousel below; every
+      //     selected site (1 or 2) gets its own line on the trend chart. ---
+      function handleLocationClick(graphic, addToCompare) {
+        const locationID = graphic.attributes.locationID;
+
+        if (addToCompare) {
+          const existingIndex = selectedSites.findIndex(function (s) { return s.locationID === locationID; });
+          if (existingIndex !== -1) {
+            selectedSites.splice(existingIndex, 1);
+          } else {
+            selectedSites.push({ locationID: locationID, attrs: graphic.attributes, graphic: graphic });
+            if (selectedSites.length > 2) selectedSites.shift();
+          }
+        } else {
+          selectedSites = [{ locationID: locationID, attrs: graphic.attributes, graphic: graphic }];
+        }
+
+        if (selectedSites.length === 0) {
+          clearLocationSelection();
+          return;
+        }
+
+        updateCompareHighlights();
+        showLocationDetails(selectedSites[selectedSites.length - 1].graphic);
+      }
+
       function showLocationDetails(graphic) {
         const attrs = graphic.attributes;
-
-        // Glow the clicked point so it's obvious which site the panel and
-        // chart below now describe. Swaps in as soon as the layer view is
-        // ready - already resolved after the first click, so this is
-        // effectively instant from then on.
-        locationsLayerViewPromise.then(function (layerView) {
-          clearLocationHighlight();
-          highlightHandle = layerView.highlight(graphic);
-        });
 
         document.getElementById("detailsPlaceholder").style.display = "none";
         document.getElementById("detailsContent").style.display = "block";
@@ -1445,57 +2175,78 @@
         document.getElementById("locationName").innerText = attrs.locationName || "(unnamed location)";
         document.getElementById("locationOrg").innerText = attrs.organisationName || "";
 
-        // These stats are already stored on the location itself - no extra query needed
-        document.getElementById("statSurveys").innerText = attrs.totalSurveys ?? "-";
-        document.getElementById("statPhosphate").innerText = formatNumber(attrs.phosphateAverage);
-        document.getElementById("statNitrate").innerText = formatNumber(attrs.nitrateAverage);
-        document.getElementById("statTurbidity").innerText = formatNumber(attrs.turbidityAverage);
+        updateStatsForPrimary(attrs.locationID);
 
-        // Build wildlife tags for any species with a count greater than 0
-        const wildlifeFields = [
-          { field: "otter", label: "Otter" },
-          { field: "dipper", label: "Dipper" },
-          { field: "waterVole", label: "Water Vole" },
-          { field: "kingfisher", label: "Kingfisher" },
-          { field: "dragonfliesOrDamselflies", label: "Dragonflies/Damselflies" },
-          { field: "heron", label: "Heron" },
-          { field: "fish", label: "Fish" },
-          { field: "greyWagtail", label: "Grey Wagtail" },
-          { field: "bats", label: "Bats" },
-          { field: "mayfliesOrCaddisflies", label: "Mayflies/Caddisflies" }
-        ];
+        // Wildlife/invasive species tags now come from per-survey
+        // sightings within the current date range (see
+        // updateWildlifeTagsForPrimary/updateInvasiveTagsForPrimary),
+        // which need this site's observation history - not fetched yet at
+        // this point - so just clear both to empty here and let
+        // loadSelectedSitesData populate them once the fetch resolves.
+        document.getElementById("wildlifeTags").innerHTML = "";
+        document.getElementById("invasiveTags").innerHTML = "";
 
-        const tagsContainer = document.getElementById("wildlifeTags");
-        tagsContainer.innerHTML = "";
-        wildlifeFields.forEach(function (w) {
-          if (attrs[w.field] > 0) {
-            const tag = document.createElement("span");
-            tag.className = "wildlifeTag";
-            tag.textContent = w.label + " (" + attrs[w.field] + ")";
-            tagsContainer.appendChild(tag);
-          }
-        });
-
-        loadObservations(attrs.locationID);
+        loadSelectedSitesData();
       }
 
       function formatNumber(value) {
         return (value === null || value === undefined) ? "-" : Number(value).toFixed(1);
       }
 
+      // --- Populates the details panel's 4 stat boxes (Total Surveys/Avg
+      //     Phosphate/Avg Nitrate/Avg Turbidity) for whichever site is
+      //     primary. Reads the SAME live, date-filtered aggregate as the
+      //     map symbology and league table (`leagueRows`) rather than the
+      //     location's stored all-time average fields, so these numbers
+      //     move with the date range too. `leagueRows` may not have this
+      //     site yet if the organisation's observation history is still
+      //     loading (see loadLeagueTable) - shows "-" placeholders in that
+      //     case, brought up to date once it resolves. ---
+      function updateStatsForPrimary(locationID) {
+        const row = leagueRows.find(function (r) { return r.locationID === locationID; });
+        document.getElementById("statSurveys").innerText = row ? row.totalSurveys : "-";
+        // One stat box per METRIC_CATALOG entry (statPhosphate,
+        // statNitrate, statNitrite, statAmmonia, statTurbidity,
+        // statConductivity - ids follow "stat" + the metric's capitalized
+        // key) rather than each hardcoded individually, so all 6 metrics
+        // stay in sync with the catalog automatically. A metric this
+        // organisation isn't collecting (not in `availableMetrics` - see
+        // updateAvailableMetrics, same check the sidebar's metric list
+        // uses) hides its whole box rather than showing an empty "-", so
+        // the grid only ever lists what this org actually measures.
+        METRIC_CATALOG.forEach(function (m) {
+          const el = document.getElementById("stat" + capitalize(m.key));
+          if (!el) return;
+          const box = el.closest(".statBox");
+          const collected = availableMetrics.some(function (am) { return am.key === m.key; });
+          if (box) box.style.display = collected ? "" : "none";
+          if (collected) el.innerText = formatNumber(row ? row[m.locationField] : null);
+        });
+      }
+
       // --- Site league table: ranks every site belonging to one
-      //     organisation by any water quality metric. Unlike the trend
-      //     chart, this doesn't need the Observations table at all - the
-      //     locations layer already stores a per-site average for each
-      //     metric (checked against the live service's field list), so one
-      //     query against `locationsLayer` gets everything the table needs.
-      //     Sorting then happens client-side against the cached rows, so
-      //     clicking a different column header is instant, not a requery.
+      //     organisation by any water quality metric. Its numbers - and
+      //     the map's point symbology, and a selected site's stat boxes -
+      //     all come from the SAME live aggregate (`leagueRows`), computed
+      //     client-side from raw Observations within the current date
+      //     range rather than read from the locations layer's stored
+      //     all-time average fields. That's what makes all three move
+      //     together whenever the date range changes.
       //
-      //     `leagueRows` is also what the sidebar's metric list and the
-      //     map's symbology read to figure out which metrics this
-      //     organisation actually collects, and their min/max - see
-      //     updateAvailableMetrics / updateSymbology. ---
+      //     Getting there takes two queries per organisation (not
+      //     per date-range change): `orgSiteList` is just the org's site
+      //     id/name pairs, from `locationsLayer`; `orgObservations` is
+      //     every one of those sites' observations - locationID,
+      //     created_at, and the 6 metric fields only, no photos/weather/
+      //     etc, since no aggregate here needs them - from
+      //     `observationsTable`. `recomputeLeagueRows` then re-derives
+      //     `leagueRows` from those two, filtered to the current date
+      //     range, purely client-side - no requery needed to react to a
+      //     date change, only to switch organisation (see loadLeagueTable).
+      //
+      //     Sorting the table itself happens client-side against the
+      //     cached rows too, so clicking a different column header is
+      //     instant, not a requery. ---
       const LEAGUE_COLUMNS = [
         { field: "locationName", label: "Location", type: "text" },
         { field: "totalSurveys", label: "Surveys", type: "number" }
@@ -1503,13 +2254,40 @@
         return { field: m.locationField, label: m.label, type: "number" };
       }));
 
-      let leagueRows = []; // cached site attributes for the org currently shown
+      let orgSiteList = []; // [{ locationID, locationName }] for the org currently shown
+      let orgObservations = []; // that org's raw observations (lean fields), unfiltered by date
+      let leagueRows = []; // live, date-filtered per-site aggregate derived from the above two - see recomputeLeagueRows
       let leagueSort = { field: "locationName", direction: "asc" };
       // locationID GUIDs checked in the league table - see applyLocationFilter.
       // Reset whenever the organisation changes (selectOrganisation), but
       // deliberately NOT reset by loadLeagueTable itself, so the selection
       // survives switching away to the Map tab and back.
       let leagueSelectedIDs = new Set();
+
+      // --- Re-derives `leagueRows` from `orgSiteList` + `orgObservations`,
+      //     narrowed to the current date range - every site in the org
+      //     gets a row (even one with zero surveys in range, so it still
+      //     shows up in the table/legend/symbology rather than silently
+      //     vanishing). Pure client-side computation over data already in
+      //     hand - safe to call as often as the date range changes. ---
+      function recomputeLeagueRows() {
+        leagueRows = orgSiteList.map(function (site) {
+          const obsForSite = orgObservations.filter(function (o) {
+            return o.attributes.locationID === site.locationID && isWithinDateRange(o.attributes.created_at);
+          });
+
+          const row = { locationID: site.locationID, locationName: site.locationName, totalSurveys: obsForSite.length };
+          METRIC_CATALOG.forEach(function (m) {
+            const values = obsForSite
+              .map(function (o) { return o.attributes[m.observationField]; })
+              .filter(function (v) { return v !== null && v !== undefined; });
+            row[m.locationField] = values.length
+              ? values.reduce(function (a, b) { return a + b; }, 0) / values.length
+              : null;
+          });
+          return row;
+        });
+      }
 
       // Call with "" (e.g. "All organisations") to clear the table and show
       // the prompt instead.
@@ -1518,6 +2296,8 @@
         const wrapEl = document.getElementById("leagueTableWrap");
         const subtitleEl = document.getElementById("leagueSubtitle");
 
+        orgSiteList = [];
+        orgObservations = [];
         leagueRows = [];
         wrapEl.style.display = "none";
         updateAvailableMetrics();
@@ -1534,29 +2314,56 @@
         emptyEl.hidden = false;
 
         const escapedName = orgName.replace(/'/g, "''");
-        const query = locationsLayer.createQuery();
-        query.where = `organisationName = '${escapedName}'`;
-        query.returnGeometry = false;
-        query.outFields = ["locationID", "locationName", "totalSurveys"].concat(METRIC_CATALOG.map(function (m) { return m.locationField; }));
+        const siteQuery = locationsLayer.createQuery();
+        siteQuery.where = `organisationName = '${escapedName}'`;
+        siteQuery.returnGeometry = false;
+        siteQuery.outFields = ["locationID", "locationName"];
 
-        locationsLayer.queryFeatures(query).then(function (result) {
+        locationsLayer.queryFeatures(siteQuery).then(function (siteResult) {
           // A stale response for an org the user has since navigated away
           // from shouldn't clobber what's on screen now.
           if (orgFilter.value !== orgName) return;
 
-          leagueRows = result.features.map(function (f) { return f.attributes; });
-          updateAvailableMetrics();
+          orgSiteList = siteResult.features.map(function (f) {
+            return { locationID: f.attributes.locationID, locationName: f.attributes.locationName };
+          });
 
-          if (leagueRows.length === 0) {
+          if (orgSiteList.length === 0) {
             emptyEl.textContent = "No sites found for this organisation.";
             emptyEl.hidden = false;
+            recomputeLeagueRows();
+            updateAvailableMetrics();
             return;
           }
 
-          emptyEl.hidden = true;
-          wrapEl.style.display = "block";
-          renderLeagueTable();
-          updateSelectionBar();
+          emptyEl.textContent = "Loading survey history...";
+
+          const idList = orgSiteList.map(function (s) { return `'${escapeSql(s.locationID)}'`; }).join(", ");
+          const obsQuery = observationsTable.createQuery();
+          obsQuery.where = `locationID IN (${idList})`;
+          obsQuery.returnGeometry = false;
+          obsQuery.outFields = ["locationID", "created_at"].concat(METRIC_CATALOG.map(function (m) { return m.observationField; }));
+
+          return observationsTable.queryFeatures(obsQuery).then(function (obsResult) {
+            if (orgFilter.value !== orgName) return;
+
+            orgObservations = obsResult.features;
+            recomputeLeagueRows();
+            updateAvailableMetrics();
+            applyLocationFilter(); // now we know which sites actually have a survey in range
+
+            emptyEl.hidden = true;
+            wrapEl.style.display = "block";
+            renderLeagueTable();
+            updateSelectionBar();
+
+            // A site may already be selected (e.g. this resolved after a
+            // quick click) - its stat boxes were showing "-" placeholders
+            // until now, so bring them up to date.
+            if (selectedSites.length > 0) {
+              updateStatsForPrimary(selectedSites[selectedSites.length - 1].locationID);
+            }
+          });
         }).catch(function (error) {
           if (orgFilter.value !== orgName) return;
           emptyEl.textContent = "Couldn't load the league table.";
@@ -1711,21 +2518,26 @@
         updateSelectionBar();
       });
 
-      // `currentObservations` holds the full, ascending-by-date survey
-      // history for whichever location is currently open - fetched once
-      // per location click, then re-used (no requery) whenever the
-      // sidebar's metric list picks a different metric (see selectMetric).
+      // --- Selection state for site comparison ---
+      // `selectedSites` holds the 1 or 2 currently-selected sites, in click
+      // order (see handleLocationClick above) - `{ locationID, attrs,
+      // graphic }` each. The last entry is "primary": its stats/wildlife
+      // tags/survey carousel are what the details panel shows. Every entry
+      // gets its own line on the trend chart.
       //
-      // `dailyObservations` is derived from it by averaging together any
-      // surveys that fall on the same calendar day, so a day with two
-      // visits plots as one point rather than two - see
-      // groupObservationsByDay. The chart reads from this instead.
+      // `siteDataCache` caches each site's fetched observation history by
+      // locationID (`{ currentObservations, dailyObservations,
+      // recentObservations }`) so re-selecting a site, or keeping it
+      // selected while switching the sidebar's metric, never re-queries -
+      // see fetchSiteObservations.
       //
-      // `recentObservations` is the last 5 surveys, newest first - what the
-      // "Recent surveys" carousel flicks through. `surveyIndex` is which of
-      // those 5 is currently showing (0 = most recent).
-      let currentObservations = [];
-      let dailyObservations = [];
+      // `recentObservations` is the PRIMARY site's last 5 surveys, newest
+      // first - what the "Recent surveys" carousel flicks through.
+      // `surveyIndex` is which of those 5 is currently showing (0 = most
+      // recent). Only the primary site needs this - a comparison site only
+      // ever needs its `dailyObservations` for the chart.
+      let selectedSites = [];
+      let siteDataCache = {};
       let recentObservations = [];
       let surveyIndex = 0;
 
@@ -1751,19 +2563,17 @@
         return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
       }
 
-      // --- Query the Observations table for this location's full survey
-      //     history. locationID is a GUID field - the value from the
-      //     location graphic already comes back wrapped in curly braces,
-      //     so we just quote it. ---
-      function loadObservations(locationID) {
-        currentObservations = [];
-        dailyObservations = [];
-        recentObservations = [];
-        surveyIndex = 0;
-        renderChart();
-        renderSurveyCard();
-
-        if (!locationID) return;
+      // --- Query the Observations table for one location's full survey
+      //     history, cached by locationID so a site already fetched (e.g.
+      //     still selected as the comparison site while you flick through
+      //     metrics, or re-selected later) never gets requeried.
+      //     locationID is a GUID field - the value from the location
+      //     graphic already comes back wrapped in curly braces, so we just
+      //     quote it. Returns a promise resolving to the cache entry. ---
+      function fetchSiteObservations(locationID) {
+        if (siteDataCache[locationID]) {
+          return Promise.resolve(siteDataCache[locationID]);
+        }
 
         const query = observationsTable.createQuery();
         query.where = `locationID = '${locationID}'`;
@@ -1773,23 +2583,128 @@
           "ammonia", "clarity", "water_level", "water_flow",
           "rain_previous_24hrs"
         ].concat(WEATHER_FIELDS.map(function (w) { return w.field; }))
-          .concat(PHOTO_FIELDS);
+          .concat(PHOTO_FIELDS)
+          .concat(WILDLIFE_FIELDS.map(function (w) { return w.observationField; }))
+          .concat(INVASIVE_PLANT_FIELDS.map(function (w) { return w.observationField; }));
         query.orderByFields = ["created_at ASC"]; // ascending - the chart needs oldest-first
 
-        observationsTable.queryFeatures(query).then(function (result) {
-          currentObservations = result.features;
-          dailyObservations = groupObservationsByDay(currentObservations);
-          // Newest first, capped to the last 5 - the carousel flicks
-          // through these rather than a long flat list.
-          recentObservations = currentObservations.slice(-5).reverse();
-          surveyIndex = 0;
-
-          renderChart();
-          renderSurveyCard();
+        return observationsTable.queryFeatures(query).then(function (result) {
+          // Cached as the full, unfiltered history - `recentObservations`
+          // is deliberately NOT precomputed here, since it needs to
+          // respect whatever date range is currently picked, and that can
+          // change independently of which site is selected. See
+          // computeRecentObservations, which derives it from
+          // `currentObservations` fresh every time it's needed.
+          const entry = {
+            currentObservations: result.features,
+            dailyObservations: groupObservationsByDay(result.features)
+          };
+          siteDataCache[locationID] = entry;
+          return entry;
         }).catch(function (error) {
           console.error(error);
-          renderChart();
+          const entry = { currentObservations: [], dailyObservations: [] };
+          siteDataCache[locationID] = entry;
+          return entry;
+        });
+      }
+
+      // Derives the "Recent surveys" carousel data for one site: its full
+      // cached history, narrowed to the current date range, newest-first
+      // and capped to 5 - recomputed fresh (not cached) since the date
+      // range can change at any time. See fetchSiteObservations.
+      function computeRecentObservations(locationID) {
+        const cached = siteDataCache[locationID];
+        if (!cached) return [];
+        return cached.currentObservations
+          .filter(function (f) { return isWithinDateRange(f.attributes.created_at); })
+          .slice(-5)
+          .reverse();
+      }
+
+      // Shared by updateWildlifeTagsForPrimary and
+      // updateInvasiveTagsForPrimary below - both tally the same shape of
+      // data (how many of a fixed list of "Yes" fields turned up across a
+      // set of observations), just with a different field list, tag CSS
+      // class, and container.
+      function renderSightingTags(containerId, tagClassName, fields, obsInRange) {
+        const tagsContainer = document.getElementById(containerId);
+        tagsContainer.innerHTML = "";
+
+        fields.forEach(function (f) {
+          const count = obsInRange.filter(function (o) { return o.attributes[f.observationField] === "Yes"; }).length;
+          if (count > 0) {
+            const tag = document.createElement("span");
+            tag.className = tagClassName;
+            tag.textContent = f.label + " (" + count + ")";
+            tagsContainer.appendChild(tag);
+          }
+        });
+      }
+
+      // --- Populates the "Wildlife spotted" tags for the primary site:
+      //     how many of its surveys within the current date range recorded
+      //     each species (WILDLIFE_FIELDS holds "Yes" per survey, not a
+      //     count) - a tag only shows if that count is above 0. Reads the
+      //     same cached, unfiltered observation history as the carousel
+      //     (see fetchSiteObservations) and narrows it by date here, so no
+      //     extra query is needed just for this. Leaves the tags empty
+      //     (rather than erroring) if the site's history hasn't been
+      //     fetched yet - the caller is expected to call this again once
+      //     it has, same as the carousel/chart/stat boxes. ---
+      function updateWildlifeTagsForPrimary(locationID) {
+        const cached = siteDataCache[locationID];
+        if (!cached) {
+          document.getElementById("wildlifeTags").innerHTML = "";
+          return;
+        }
+
+        const obsInRange = cached.currentObservations.filter(function (f) { return isWithinDateRange(f.attributes.created_at); });
+        renderSightingTags("wildlifeTags", "wildlifeTag", WILDLIFE_FIELDS, obsInRange);
+      }
+
+      // Same as updateWildlifeTagsForPrimary, for the "Invasive species"
+      // section (INVASIVE_PLANT_FIELDS) - see that function's comment for
+      // how it derives obsInRange and when it's called.
+      function updateInvasiveTagsForPrimary(locationID) {
+        const cached = siteDataCache[locationID];
+        if (!cached) {
+          document.getElementById("invasiveTags").innerHTML = "";
+          return;
+        }
+
+        const obsInRange = cached.currentObservations.filter(function (f) { return isWithinDateRange(f.attributes.created_at); });
+        renderSightingTags("invasiveTags", "invasiveTag", INVASIVE_PLANT_FIELDS, obsInRange);
+      }
+
+      // --- Fetches whatever's in `selectedSites` that isn't already
+      //     cached, then updates the survey carousel (primary site only)
+      //     and re-draws the trend chart (every selected site) once the
+      //     data's in. Called after every click that changes
+      //     `selectedSites`, and renders an immediate loading-safe empty
+      //     state first so the carousel/chart don't keep showing whatever
+      //     the previous selection had while the query is in flight. ---
+      function loadSelectedSitesData() {
+        const primary = selectedSites[selectedSites.length - 1];
+
+        recentObservations = [];
+        surveyIndex = 0;
+        renderSurveyCard();
+        renderChart();
+
+        Promise.all(selectedSites.map(function (s) { return fetchSiteObservations(s.locationID); })).then(function () {
+          // A later click may have changed the selection while this was in
+          // flight - only apply these results if `primary` is still
+          // actually primary.
+          const stillPrimary = selectedSites.length > 0 && selectedSites[selectedSites.length - 1].locationID === primary.locationID;
+          if (!stillPrimary) return;
+
+          recentObservations = computeRecentObservations(primary.locationID);
+          surveyIndex = 0;
           renderSurveyCard();
+          renderChart();
+          updateWildlifeTagsForPrimary(primary.locationID);
+          updateInvasiveTagsForPrimary(primary.locationID);
         });
       }
 
@@ -1808,9 +2723,19 @@
         if (recentObservations.length === 0) {
           carousel.style.display = "none";
           emptyEl.hidden = false;
-          emptyEl.textContent = currentObservations.length === 0 && dailyObservations.length === 0
-            ? "No survey records found for this location."
-            : "";
+
+          // Distinguishes "this site genuinely has no surveys" from "it
+          // has surveys, just none within the currently-picked date range"
+          // - the primary site's full, unfiltered history is what
+          // `computeRecentObservations` narrows down, so a non-empty cache
+          // entry with an empty (filtered) `recentObservations` means the
+          // date range is what's hiding everything.
+          const primary = selectedSites[selectedSites.length - 1];
+          const cached = primary && siteDataCache[primary.locationID];
+          const rangeActive = dateRangeFrom !== null || dateRangeTo !== null;
+          emptyEl.textContent = (rangeActive && cached && cached.currentObservations.length > 0)
+            ? "No surveys recorded for this location in the selected date range."
+            : "No survey records found for this location.";
           return;
         }
 
@@ -1853,7 +2778,7 @@
         const metricsHtml = surveyMetrics.length
           ? '<div class="surveyMetrics">' + surveyMetrics.map(function (m) {
               return '<div class="surveyMetric">' +
-                '<span class="surveyMetricSwatch" style="background:' + m.colorDark + '"></span>' +
+                '<span class="surveyMetricSwatch" style="background:' + metricColor(m) + '"></span>' +
                 '<span class="surveyMetricLabel">' + m.label + '</span>' +
                 '<span class="surveyMetricValue">' + formatNumber(a[m.observationField]) + '</span>' +
                 '</div>';
@@ -1993,42 +2918,86 @@
       }
 
       // --- Draw the trend chart for whichever metric is currently picked,
-      //     from `dailyObservations` (same-day surveys already averaged
-      //     into one point per day - see groupObservationsByDay). A line
-      //     chart is the right form here (a single measurement, changing
-      //     over time), so it gets one series in the sequential accent hue,
-      //     a crosshair that snaps to the nearest reading, and a direct
-      //     label on the most recent value - no legend box, since the
-      //     title already names the one thing being plotted. The panel now
-      //     spans the bottom of the map area, so its size is measured from
-      //     the actual (wide, short) container rather than assumed. ---
+      //     from every selected site's `dailyObservations` (same-day
+      //     surveys already averaged into one point per day - see
+      //     groupObservationsByDay / fetchSiteObservations). With 1 site
+      //     selected this is a single line in the metric's own color, same
+      //     as always. With 2 (comparing), each selected site gets its own
+      //     line in that SAME color - solid for the first, dashed for the
+      //     second - plus a small legend naming both, since the title alone
+      //     can no longer say which line is which. The panel spans the
+      //     bottom of the map area, so its size is measured from the
+      //     actual (wide, short) container rather than assumed. ---
       function renderChart() {
         const svg = document.getElementById("trendChartSvg");
         const tooltip = document.getElementById("chartTooltip");
         const emptyEl = document.getElementById("chartEmpty");
         const titleEl = document.getElementById("chartTitle");
+        const legendEl = document.getElementById("chartLegend");
         const wrapEl = document.querySelector("#trendChartRoot .chartWrap");
 
         const metric = METRIC_CATALOG.find(function (m) { return m.key === selectedMetricKey; }) || METRIC_CATALOG[0];
-        titleEl.textContent = metric.label + " over time";
+        const comparing = selectedSites.length > 1;
 
         svg.innerHTML = "";
         tooltip.hidden = true;
 
-        const points = dailyObservations
-          .map(function (f) {
-            return { date: f.attributes.created_at, value: f.attributes[metric.observationField] };
-          })
-          .filter(function (p) {
-            return p.date !== null && p.date !== undefined && p.value !== null && p.value !== undefined;
-          });
+        const series = selectedSites.map(function (s, i) {
+          const cached = siteDataCache[s.locationID];
+          const daily = cached ? cached.dailyObservations : [];
+          const points = daily
+            .map(function (f) { return { date: f.attributes.created_at, value: f.attributes[metric.observationField] }; })
+            .filter(function (p) { return p.date !== null && p.date !== undefined && p.value !== null && p.value !== undefined; })
+            .filter(function (p) { return isWithinDateRange(p.date); });
 
-        if (points.length < 2) {
+          return {
+            siteName: s.attrs.locationName || "(unnamed location)",
+            // Comparing two sites: each site gets its own fixed color (see
+            // compareColor/COMPARE_SITE_COLORS) so the two lines read as
+            // "two different places" at a glance, not "two lines that
+            // happen to be dashed differently" - a single site still uses
+            // the selected metric's own color, matching its dot on the map.
+            color: comparing ? compareColor(i) : metricColor(metric),
+            dashed: i === 1,
+            points: points
+          };
+        });
+
+        titleEl.textContent = metric.label + " over time" + (comparing ? " — comparing " + series.length + " sites" : "");
+
+        legendEl.innerHTML = "";
+        // `.chartLegend` sets display:flex as a class rule, which beats the
+        // [hidden] attribute's UA display:none on specificity alone (see
+        // the same note on .leagueSelectionBar below) - toggle display
+        // directly instead so hiding actually hides it.
+        legendEl.style.display = comparing ? "flex" : "none";
+        if (comparing) {
+          series.forEach(function (s) {
+            const item = document.createElement("span");
+            item.className = "chartLegendItem";
+            const swatch = document.createElement("span");
+            swatch.className = "chartLegendSwatch" + (s.dashed ? " dashed" : "");
+            swatch.style.setProperty("--legend-color", s.color);
+            const label = document.createElement("span");
+            label.textContent = s.siteName + (s.points.length === 0 ? " (no data)" : "");
+            item.appendChild(swatch);
+            item.appendChild(label);
+            legendEl.appendChild(item);
+          });
+        }
+
+        // A line needs 2+ points; a series with only 1 point still gets a
+        // lone marker (below) but can't draw a trend by itself.
+        const drawableSeries = series.filter(function (s) { return s.points.length >= 2; });
+        const totalPoints = series.reduce(function (n, s) { return n + s.points.length; }, 0);
+
+        if (drawableSeries.length === 0) {
           svg.style.display = "none";
           emptyEl.hidden = false;
-          emptyEl.textContent = points.length === 0
-            ? "No " + metric.label.toLowerCase() + " readings recorded for this location."
-            : "Only one day of " + metric.label.toLowerCase() + " readings recorded - not enough to chart a trend.";
+          const rangeActive = dateRangeFrom !== null || dateRangeTo !== null;
+          emptyEl.textContent = totalPoints === 0
+            ? "No " + metric.label.toLowerCase() + " readings recorded for the selected site" + (comparing ? "s" : "") + (rangeActive ? " in this date range." : ".")
+            : "Not enough " + metric.label.toLowerCase() + " readings recorded" + (rangeActive ? " in this date range" : " yet") + " to chart a trend.";
           return;
         }
 
@@ -2048,10 +3017,16 @@
 
         svg.setAttribute("viewBox", "0 0 " + width + " " + height);
 
-        const xMin = points[0].date;
-        const xMax = points[points.length - 1].date;
-        const rawValues = points.map(function (p) { return p.value; });
-        const yTicks = niceTicks(Math.min.apply(null, rawValues), Math.max.apply(null, rawValues), 4);
+        // Domain spans every selected site's points (even a lone reading
+        // from a 1-point series) so a comparison site with sparser data
+        // still places correctly relative to the other's line, rather than
+        // each series scaling independently.
+        const allPoints = series.reduce(function (acc, s) { return acc.concat(s.points); }, []);
+        const allDates = allPoints.map(function (p) { return p.date; });
+        const allValues = allPoints.map(function (p) { return p.value; });
+        const xMin = Math.min.apply(null, allDates);
+        const xMax = Math.max.apply(null, allDates);
+        const yTicks = niceTicks(Math.min.apply(null, allValues), Math.max.apply(null, allValues), 4);
 
         function xScale(d) {
           return xMax === xMin ? marginLeft + plotW / 2 : marginLeft + ((d - xMin) / (xMax - xMin)) * plotW;
@@ -2069,10 +3044,6 @@
         const colBaseline = rootStyle.getPropertyValue("--baseline").trim();
         const colSurface = rootStyle.getPropertyValue("--surface-1").trim();
         const colText = rootStyle.getPropertyValue("--text-primary").trim();
-        // The line's color follows the selected metric (matching its map
-        // marker and its sidebar swatch) - the dashboard is fixed dark
-        // throughout now, so always the metric's dark-surface variant.
-        const colSeries = metric.colorDark;
 
         function addEl(tag, attrs) {
           const el = document.createElementNS(svgNS, tag);
@@ -2096,46 +3067,105 @@
           stroke: colBaseline, "stroke-width": 1
         });
 
-        // X-axis labels: first, middle, last - never every point
-        const xLabelIdxs = points.length > 2
-          ? [0, Math.floor((points.length - 1) / 2), points.length - 1]
-          : [0, points.length - 1];
-        xLabelIdxs.forEach(function (i) {
-          const p = points[i];
-          const anchor = i === 0 ? "start" : (i === points.length - 1 ? "end" : "middle");
-          addEl("text", { x: xScale(p.date), y: height - 6, "text-anchor": anchor, "font-size": 9, fill: colMuted })
-            .textContent = formatDateShort(p.date);
+        // X-axis labels: first, middle, last across the combined date
+        // range - never every point, and never a duplicate label if two
+        // series happen to share an endpoint date.
+        const sortedDates = allDates.slice().sort(function (a, b) { return a - b; });
+        const xLabelDates = sortedDates.length > 2
+          ? [sortedDates[0], sortedDates[Math.floor((sortedDates.length - 1) / 2)], sortedDates[sortedDates.length - 1]]
+          : [sortedDates[0], sortedDates[sortedDates.length - 1]];
+        const seenLabelX = {};
+        xLabelDates.forEach(function (d, i) {
+          const x = Math.round(xScale(d));
+          if (seenLabelX[x]) return;
+          seenLabelX[x] = true;
+          const anchor = i === 0 ? "start" : (i === xLabelDates.length - 1 ? "end" : "middle");
+          addEl("text", { x: xScale(d), y: height - 6, "text-anchor": anchor, "font-size": 9, fill: colMuted })
+            .textContent = formatDateShort(d);
         });
 
-        // The line itself - 2px, round join/cap
-        const pathData = points.map(function (p, i) {
-          return (i === 0 ? "M" : "L") + xScale(p.date).toFixed(1) + "," + yScale(p.value).toFixed(1);
-        }).join(" ");
-        addEl("path", {
-          d: pathData, fill: "none", stroke: colSeries,
-          "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"
+        // Above this many points on one series, a label at every point
+        // would overlap into an unreadable smear - falls back to just the
+        // single latest-value label instead (still always gets a dot per
+        // point either way, just not a permanent label per point).
+        const PER_POINT_LABEL_MAX = 12;
+
+        // Each series' line (2+ points, 2px round join/cap - dashed for
+        // the second/comparison site) or lone marker (exactly 1 point).
+        // Every point gets its own dot now, not just the most recent, so
+        // it's clear exactly which dates were actually surveyed rather
+        // than just the shape of the line between them - the most recent
+        // point stays slightly larger, same as its old "end marker" role.
+        series.forEach(function (s) {
+          if (s.points.length >= 2) {
+            const pathData = s.points.map(function (p, i) {
+              return (i === 0 ? "M" : "L") + xScale(p.date).toFixed(1) + "," + yScale(p.value).toFixed(1);
+            }).join(" ");
+            addEl("path", {
+              d: pathData, fill: "none", stroke: s.color,
+              "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round",
+              "stroke-dasharray": s.dashed ? "5,4" : "none"
+            });
+
+            s.points.forEach(function (p, i) {
+              const isLast = i === s.points.length - 1;
+              addEl("circle", {
+                cx: xScale(p.date), cy: yScale(p.value),
+                r: isLast ? 4 : 3, fill: s.color, stroke: colSurface, "stroke-width": isLast ? 2 : 1.5
+              });
+            });
+
+            // A permanent value label at every point when there aren't too
+            // many to stay legible; otherwise just the latest value, as
+            // before. Skipped entirely when comparing 2 sites - two sets
+            // of labels criss-crossing each other reads as noise, and the
+            // legend + hover tooltip already say which line is which.
+            if (!comparing && s.points.length <= PER_POINT_LABEL_MAX) {
+              s.points.forEach(function (p) {
+                const cx = xScale(p.date), cy = yScale(p.value);
+                addEl("text", {
+                  x: cx, y: cy - 9 < marginTop + 8 ? cy + 15 : cy - 9,
+                  "text-anchor": "middle",
+                  "font-size": 10, "font-weight": "bold", fill: colText
+                }).textContent = formatTickValue(p.value);
+              });
+            } else if (!comparing) {
+              const last = s.points[s.points.length - 1];
+              const endCx = xScale(last.date), endCy = yScale(last.value);
+              const labelNearRightEdge = endCx > width - marginRight - 30;
+              addEl("text", {
+                x: labelNearRightEdge ? endCx - 8 : endCx + 8,
+                y: endCy - 8 < marginTop + 8 ? endCy + 14 : endCy - 8,
+                "text-anchor": labelNearRightEdge ? "end" : "start",
+                "font-size": 10, "font-weight": "bold", fill: colText
+              }).textContent = formatTickValue(last.value);
+            }
+          } else if (s.points.length === 1) {
+            const p = s.points[0];
+            const cx = xScale(p.date), cy = yScale(p.value);
+            addEl("circle", { cx: cx, cy: cy, r: 4, fill: s.color, stroke: colSurface, "stroke-width": 2 });
+            if (!comparing) {
+              addEl("text", {
+                x: cx, y: cy - 9 < marginTop + 8 ? cy + 15 : cy - 9,
+                "text-anchor": "middle",
+                "font-size": 10, "font-weight": "bold", fill: colText
+              }).textContent = formatTickValue(p.value);
+            }
+          }
         });
 
-        // End-of-line marker + direct label (the value the story is about)
-        const last = points[points.length - 1];
-        const endCx = xScale(last.date), endCy = yScale(last.value);
-        addEl("circle", { cx: endCx, cy: endCy, r: 4, fill: colSeries, stroke: colSurface, "stroke-width": 2 });
-
-        const labelNearRightEdge = endCx > width - marginRight - 30;
-        addEl("text", {
-          x: labelNearRightEdge ? endCx - 8 : endCx + 8,
-          y: endCy - 8 < marginTop + 8 ? endCy + 14 : endCy - 8,
-          "text-anchor": labelNearRightEdge ? "end" : "start",
-          "font-size": 10, "font-weight": "bold", fill: colText
-        }).textContent = formatTickValue(last.value);
-
-        // Hover layer: crosshair + snapping tooltip, mouse and keyboard
+        // Hover layer: crosshair + snapping tooltip, mouse and keyboard.
+        // The nearest point is found independently per series (their
+        // survey dates rarely line up exactly), and the tooltip stacks a
+        // block per series that has one nearby - so comparing two sites
+        // shows both readings together at once instead of two floating
+        // tooltips.
         const crosshair = addEl("line", {
           y1: marginTop, y2: marginTop + plotH,
           stroke: colBaseline, "stroke-width": 1, visibility: "hidden"
         });
-        const hoverDot = addEl("circle", {
-          r: 5, fill: colSeries, stroke: colSurface, "stroke-width": 2, visibility: "hidden"
+        const hoverDots = series.map(function (s) {
+          return addEl("circle", { r: 5, fill: s.color, stroke: colSurface, "stroke-width": 2, visibility: "hidden" });
         });
         const overlay = addEl("rect", {
           x: marginLeft, y: marginTop, width: plotW, height: plotH,
@@ -2144,58 +3174,117 @@
         overlay.style.cursor = "crosshair";
         overlay.style.outline = "none";
 
-        let hoverIdx = points.length - 1;
+        // Index into each series' own points array - kept per series since
+        // they don't share a date axis. Defaults to each series' most
+        // recent point. The first series with an actual line drives
+        // keyboard left/right stepping.
+        let hoverIdxBySeries = series.map(function (s) { return s.points.length - 1; });
+        const refIdx = series.findIndex(function (s) { return s.points.length >= 2; });
 
-        function showPointAt(idx) {
-          hoverIdx = Math.max(0, Math.min(points.length - 1, idx));
-          const p = points[hoverIdx];
-          const cx = xScale(p.date), cy = yScale(p.value);
-
-          crosshair.setAttribute("x1", cx);
-          crosshair.setAttribute("x2", cx);
-          crosshair.setAttribute("visibility", "visible");
-          hoverDot.setAttribute("cx", cx);
-          hoverDot.setAttribute("cy", cy);
-          hoverDot.setAttribute("visibility", "visible");
-
-          const wrapRect = svg.parentElement.getBoundingClientRect();
-          const scaleFactor = wrapRect.width / width;
-          tooltip.style.left = (cx * scaleFactor) + "px";
-          tooltip.style.top = (cy * scaleFactor) + "px";
+        function showPointAt(px) {
+          let crosshairX = null;
           tooltip.innerHTML = "";
-          const valueEl = document.createElement("div");
-          valueEl.className = "ttValue";
-          valueEl.textContent = formatTickValue(p.value);
-          const dateEl = document.createElement("div");
-          dateEl.className = "ttDate";
-          dateEl.textContent = formatDateLong(p.date);
-          tooltip.appendChild(valueEl);
-          tooltip.appendChild(dateEl);
+          let anyShown = false;
+
+          series.forEach(function (s, si) {
+            if (s.points.length === 0) {
+              hoverDots[si].setAttribute("visibility", "hidden");
+              return;
+            }
+
+            let nearestIdx = 0, nearestDist = Infinity;
+            s.points.forEach(function (p, i) {
+              const d = Math.abs(xScale(p.date) - px);
+              if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+            });
+            hoverIdxBySeries[si] = nearestIdx;
+
+            const p = s.points[nearestIdx];
+            const cx = xScale(p.date), cy = yScale(p.value);
+            hoverDots[si].setAttribute("cx", cx);
+            hoverDots[si].setAttribute("cy", cy);
+            hoverDots[si].setAttribute("visibility", "visible");
+            if (crosshairX === null) crosshairX = cx;
+
+            const row = document.createElement("div");
+            if (comparing) {
+              const nameEl = document.createElement("div");
+              nameEl.className = "ttSite";
+              nameEl.textContent = s.siteName;
+              row.appendChild(nameEl);
+            }
+            const valueEl = document.createElement("div");
+            valueEl.className = "ttValue";
+            valueEl.textContent = formatTickValue(p.value);
+            const dateEl = document.createElement("div");
+            dateEl.className = "ttDate";
+            dateEl.textContent = formatDateLong(p.date);
+            row.appendChild(valueEl);
+            row.appendChild(dateEl);
+            tooltip.appendChild(row);
+            anyShown = true;
+          });
+
+          if (!anyShown) return;
+
+          crosshair.setAttribute("x1", crosshairX);
+          crosshair.setAttribute("x2", crosshairX);
+          crosshair.setAttribute("visibility", "visible");
+
+          // The tooltip is `position: fixed`, so its left/top are viewport
+          // coordinates, not coordinates relative to .chartWrap - convert
+          // through the svg's live rendered box (not the width/height
+          // captured at render time) so it stays correctly placed even if
+          // the window has been resized since the chart last drew.
+          const svgRect = svg.getBoundingClientRect();
+          const scaleX = svgRect.width / width;
+          const scaleY = svgRect.height / height;
+          const topCy = Math.min.apply(null, hoverDots
+            .filter(function (d) { return d.getAttribute("visibility") === "visible"; })
+            .map(function (d) { return Number(d.getAttribute("cy")); }));
+          tooltip.style.left = (svgRect.left + crosshairX * scaleX) + "px";
+          tooltip.style.top = (svgRect.top + topCy * scaleY) + "px";
           tooltip.hidden = false;
+
+          // Nudge back on-screen if the centered/above-point placement would
+          // push it past the window's edges (e.g. hovering a point near the
+          // left edge of the chart, or the very top of the chart panel).
+          const ttRect = tooltip.getBoundingClientRect();
+          const edgeMargin = 8;
+          if (ttRect.left < edgeMargin) {
+            tooltip.style.left = (parseFloat(tooltip.style.left) + (edgeMargin - ttRect.left)) + "px";
+          } else if (ttRect.right > window.innerWidth - edgeMargin) {
+            tooltip.style.left = (parseFloat(tooltip.style.left) - (ttRect.right - (window.innerWidth - edgeMargin))) + "px";
+          }
+          if (ttRect.top < edgeMargin) {
+            tooltip.style.top = (parseFloat(tooltip.style.top) + (edgeMargin - ttRect.top)) + "px";
+          }
         }
 
         function hidePoint() {
           crosshair.setAttribute("visibility", "hidden");
-          hoverDot.setAttribute("visibility", "hidden");
+          hoverDots.forEach(function (d) { d.setAttribute("visibility", "hidden"); });
           tooltip.hidden = true;
         }
 
         overlay.addEventListener("pointermove", function (evt) {
           const rect = svg.getBoundingClientRect();
           const px = (evt.clientX - rect.left) * (width / rect.width);
-          let nearestIdx = 0, nearestDist = Infinity;
-          points.forEach(function (p, i) {
-            const d = Math.abs(xScale(p.date) - px);
-            if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
-          });
-          showPointAt(nearestIdx);
+          showPointAt(px);
         });
         overlay.addEventListener("pointerleave", hidePoint);
-        overlay.addEventListener("focus", function () { showPointAt(hoverIdx); });
+        overlay.addEventListener("focus", function () {
+          const refPoints = series[refIdx].points;
+          showPointAt(xScale(refPoints[hoverIdxBySeries[refIdx]].date));
+        });
         overlay.addEventListener("blur", hidePoint);
         overlay.addEventListener("keydown", function (evt) {
-          if (evt.key === "ArrowRight") { evt.preventDefault(); showPointAt(hoverIdx + 1); }
-          else if (evt.key === "ArrowLeft") { evt.preventDefault(); showPointAt(hoverIdx - 1); }
+          if (evt.key !== "ArrowRight" && evt.key !== "ArrowLeft") return;
+          evt.preventDefault();
+          const dir = evt.key === "ArrowRight" ? 1 : -1;
+          const refPoints = series[refIdx].points;
+          const newIdx = Math.max(0, Math.min(refPoints.length - 1, hoverIdxBySeries[refIdx] + dir));
+          showPointAt(xScale(refPoints[newIdx].date));
         });
       }
 
@@ -2250,17 +3339,17 @@
       // "resize" fires continuously while dragging.
       let resizeTimer = null;
       window.addEventListener("resize", function () {
-        if (dailyObservations.length === 0) return;
+        if (selectedSites.length === 0) return;
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(renderChart, 150);
       });
 
-      // Populate the metric list right away (all six metrics, nothing to
-      // narrow by yet) so it's ready the instant an org is picked and the
-      // panel becomes visible - placed last so every value it touches
+      // Restores the saved light/dark choice (defaulting to dark), which
+      // also populates the metric list and symbology for the first time
+      // (all six metrics, nothing to narrow by yet, so it's ready the
+      // instant an org is picked) - placed last so every value it touches
       // (leagueRows, etc.) is already initialized.
-      renderMetricList();
-      updateSymbology();
+      initTheme();
       // Hidden until an organisation is actually selected (see
       // updateMetricPanelVisibility) - nothing to symbolize before then.
       updateMetricPanelVisibility();
@@ -2272,7 +3361,13 @@
   <div id="appContainer">
 
     <div id="sidebar">
-      <h2>River Survey Dashboard</h2>
+      <div id="sidebarHeader">
+        <h2>River Survey Dashboard</h2>
+        <button type="button" id="themeToggle" class="themeToggleBtn" aria-pressed="false" title="Switch to light mode">
+          <span id="themeToggleIcon" aria-hidden="true">&#9728;</span>
+          <span id="themeToggleLabel">Light mode</span>
+        </button>
+      </div>
 
       <div id="onboardingBanner" class="onboardingBanner">
         <button type="button" id="onboardingDismiss" class="onboardingDismiss" aria-label="Dismiss">&times;</button>
@@ -2294,17 +3389,31 @@
       <label id="metricListLabel" title="Choose which water quality metric sizes the map's points and appears in the chart below">Water quality metric</label>
       <div id="metricList" class="metricList" role="listbox" aria-label="Water quality metric"></div>
       <div id="symbolLegend"></div>
+
+      <label id="dateRangeLabel" title="Only show surveys within this date range on the chart and Recent surveys carousel">Date range</label>
+      <div id="dateRangeRow" class="dateRangeRow">
+        <input type="date" id="dateFrom" aria-label="From date" />
+        <span class="dateRangeSep">&ndash;</span>
+        <input type="date" id="dateTo" aria-label="To date" />
+      </div>
+      <button type="button" id="dateRangeClear" class="dateRangeClearBtn" hidden>Clear range</button>
+
+      <label id="showAllSitesRow" class="checkboxRow" title="Show every site belonging to this organisation, including ones with no surveys in the current date range, as small gray reference dots">
+        <input type="checkbox" id="showAllSitesToggle" />
+        Show all site locations
+      </label>
     </div>
 
     <div id="mapArea">
       <div id="mapColumn">
-        <div id="viewDiv" class="onboardingHighlight" title="Click a shaded area to select that organisation, or click a point to see site details"></div>
+        <div id="viewDiv" class="onboardingHighlight" title="Click a shaded area to select that organisation, or click a point to see site details. Ctrl/Cmd-click a second point to compare two sites."></div>
 
-        <div id="chartPanel" title="Shows how the selected metric has changed over time at this site - readings from the same day are averaged into one point">
+        <div id="chartPanel" title="Shows how the selected metric has changed over time - readings from the same day are averaged into one point. Ctrl/Cmd-click a second site on the map to compare it here">
           <div id="chartPlaceholder">Click a location on the map to see its water quality trend.</div>
 
           <div class="viz-root" id="trendChartRoot" style="display: none;">
             <div class="chartTitle" id="chartTitle">Phosphate over time</div>
+            <div class="chartLegend" id="chartLegend" hidden></div>
             <div class="chartWrap">
               <svg id="trendChartSvg"></svg>
               <div class="chartTooltip" id="chartTooltip" hidden></div>
@@ -2335,13 +3444,28 @@
               <div class="label">Avg Nitrate</div>
             </div>
             <div class="statBox">
+              <div class="value" id="statNitrite"></div>
+              <div class="label">Avg Nitrite</div>
+            </div>
+            <div class="statBox">
+              <div class="value" id="statAmmonia"></div>
+              <div class="label">Avg Ammonia</div>
+            </div>
+            <div class="statBox">
               <div class="value" id="statTurbidity"></div>
               <div class="label">Avg Turbidity</div>
+            </div>
+            <div class="statBox">
+              <div class="value" id="statConductivity"></div>
+              <div class="label">Avg Conductivity</div>
             </div>
           </div>
 
           <h3>Wildlife spotted</h3>
           <div class="wildlifeTags" id="wildlifeTags"></div>
+
+          <h3>Invasive species</h3>
+          <div class="wildlifeTags" id="invasiveTags"></div>
 
           <h3>Recent surveys</h3>
           <div id="surveyCarousel">
