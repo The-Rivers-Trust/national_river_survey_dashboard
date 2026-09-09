@@ -45,6 +45,24 @@
       --gridline:       #2c2c2a;
       --baseline:       #454542;
       --accent:         #3987e5;
+      /* Storm overflow popup status colours - one fg/bg pair per category,
+         shared between the popup's date badge fill, headline text and
+         "ACTIVE" pill (see .stormPopupCard--* further down) and
+         independent of --accent since these encode discharge status, not
+         app chrome. This custom-built popup (see #stormPopup) reads
+         these - and every other --* token here - directly, unlike Esri's
+         own Popup widget, which is why it can actually be made to follow
+         the theme toggle reliably. Dark-theme values favour lighter,
+         slightly desaturated tints; see html[data-theme="light"] below
+         for the light-theme pairing. */
+      --storm-spilling:    #ff6f61;
+      --storm-spilling-bg: rgba(255, 111, 97, 0.18);
+      --storm-recent:      #ffb648;
+      --storm-recent-bg:   rgba(255, 182, 72, 0.18);
+      --storm-notspilling: #6fd897;
+      --storm-notspilling-bg: rgba(111, 216, 151, 0.16);
+      --storm-offline:     #b9b8ad;
+      --storm-offline-bg:  rgba(185, 184, 173, 0.16);
     }
 
     /* Light palette - same warm-gray undertone as the dark set above, just
@@ -67,6 +85,19 @@
       --gridline:       #e6e5e1;
       --baseline:       #c7c6bf;
       --accent:         #1c67c2;
+      /* Light-theme pairing for the storm overflow popup status colours -
+         see the :root block above for why these exist and how they're
+         used. Solid pale washes rather than the dark theme's translucent
+         tints, matching how --surface-1/2/3 are also solid here but
+         translucency-friendly there. */
+      --storm-spilling:    #b3261e;
+      --storm-spilling-bg: #fdecea;
+      --storm-recent:      #8a5a00;
+      --storm-recent-bg:   #fff4e0;
+      --storm-notspilling: #1e7d3c;
+      --storm-notspilling-bg: #e8f7ec;
+      --storm-offline:     #5f6368;
+      --storm-offline-bg:  #f1f1ef;
     }
 
     html, body {
@@ -80,14 +111,146 @@
       color: var(--text-primary);
     }
 
+    /* body is now a column: the full-width #topBar (selections/filters)
+       stacked above #appContainer (sidebar/map/details), rather than
+       #appContainer alone filling the whole viewport - see #topBar below
+       for why these moved out of the sidebar. */
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
     #appContainer {
       display: flex;
-      height: 100%;
+      flex: 1 1 auto;
+      min-height: 0;
       width: 100%;
     }
 
-    /* --- Left sidebar: filters - same width as the details panel on the
-       right, so the map sits evenly between two matched side panels. --- */
+    /* --- Top bar: every selection/filter that isn't specific to the
+       water quality metrics or the contextual layers panel - the Map/Site
+       league table tabs, organisation + location count, date range, and
+       "Sites yet to be surveyed" - pulled up here, out of what was an
+       increasingly crowded sidebar, so the sidebar itself can stay
+       focused on just those two things (see #sidebar below). A single
+       flex row that wraps onto more than one line on a narrow viewport
+       rather than the sidebar's old vertical stack, so each group here
+       resets its own label/spacing rather than inheriting #sidebar
+       label's vertical-stack margins. */
+    /* align-items: flex-start (not flex-end) so every group's label starts
+       on the same top line - since every group leads with a
+       same-size .topBarLabel plus the same 4px gap, that keeps the actual
+       control right under it (the tabs, the org select, the date inputs)
+       lined up at one common height, regardless of how many extra rows a
+       given group has below (Organisation's "Sites yet to be surveyed"
+       checkbox, for one) - bottom-alignment let a taller group push
+       shorter groups' controls down out of line with each other. */
+    #topBar {
+      display: flex;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 20px;
+      padding: 10px 16px;
+      background: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      box-sizing: border-box;
+    }
+
+    .topBarGroup {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .topBarLabel {
+      font-weight: bold;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    /* A thin vertical rule between groups - stretches to the row's own
+       height (which varies slightly per group) via align-self rather
+       than a fixed height, and disappears along with its neighbors once
+       #topBar wraps them onto separate lines. */
+    .topBarDivider {
+      align-self: stretch;
+      width: 1px;
+      background: var(--border);
+    }
+
+    #topBar #tabBar {
+      margin-top: 0;
+    }
+
+    /* .tabButton's flex: 1 assumed a narrow sidebar column to fill -
+       here in the top bar it would otherwise stretch to fill whatever
+       space wrapping leaves it, so each button just sizes to its own
+       label instead. */
+    #topBar .tabButton {
+      flex: none;
+      padding: 6px 14px;
+    }
+
+    #topBar #orgFilter {
+      width: 220px;
+    }
+
+    /* The tab buttons, the org select and the date inputs each reach this
+       height differently on their own (a button element at 12px font vs.
+       a select/date-input element inheriting the page's 14px, plus
+       whatever native chrome the browser adds to a select/date control) -
+       pinning all three to one explicit height is what actually makes
+       them line up, since matching padding alone isn't enough. */
+    #topBar .tabButton,
+    #topBar #orgFilter,
+    #topBar .dateRangeRow input[type="date"] {
+      height: 34px;
+      box-sizing: border-box;
+    }
+
+    #topBar .checkboxRow {
+      margin-top: 0;
+    }
+
+    /* App title, first item in the top bar. No label sits above it like
+       the other groups, so it's given its own class rather than
+       .topBarLabel + control. */
+    .topBarTitle h2 {
+      margin: 0;
+      font-size: 16px;
+      white-space: nowrap;
+      color: var(--text-primary);
+    }
+
+    /* Invisible stand-in for a .topBarLabel, used only above the theme
+       toggle button - which has no real label of its own - so that with
+       #topBar now top-aligned, the button still starts at the same height
+       as every other group's control instead of sitting a label's-height
+       higher than the rest. */
+    .topBarLabelSpacer {
+      visibility: hidden;
+    }
+
+    /* Pushes whichever group carries it (just the theme toggle, currently)
+       all the way to the row's right edge, with every other group packed
+       to the left in their normal source order. */
+    .topBarRight {
+      margin-left: auto;
+    }
+
+    /* Sits inline with the date inputs here (see the markup) rather than
+       on its own line below them, to keep the whole group to one row. */
+    #topBar .dateRangeClearBtn {
+      margin-top: 0;
+    }
+
+    /* --- Left sidebar: now just the water quality metric picker (and its
+       legend) and the contextual layers panel - everything else that used
+       to live here moved up into #topBar above. Still a flex column so
+       #contextualLayersPanel can be pinned to the bottom via
+       margin-top: auto, with the metric picker filling the space above
+       it. Same width as the details panel on the right, so the map sits
+       evenly between two matched side panels. --- */
     #sidebar {
       width: 320px;
       flex-shrink: 0;
@@ -96,19 +259,8 @@
       border-right: 1px solid var(--border);
       box-sizing: border-box;
       overflow-y: auto;
-    }
-
-    #sidebarHeader {
       display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    #sidebar h2 {
-      font-size: 16px;
-      margin-top: 0;
-      color: var(--text-primary);
+      flex-direction: column;
     }
 
     /* --- Light/dark toggle, top-right of the sidebar. Shows the mode
@@ -175,12 +327,6 @@
       color: var(--text-primary);
       border: 1px solid var(--border-strong);
       border-radius: 4px;
-    }
-
-    #locationCount {
-      margin-top: 16px;
-      font-size: 13px;
-      color: var(--text-secondary);
     }
 
     /* --- Metric list: the single selector that drives both the map's
@@ -308,6 +454,330 @@
       color: var(--accent);
     }
 
+    /* --- Date range presets: one click sets both date inputs to a
+       rolling window ending today (see applyDatePreset) rather than
+       requiring the two pickers to be set by hand. --- */
+    .dateRangePresets {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .datePresetBtn {
+      background: none;
+      border: 1px solid var(--border-strong);
+      color: var(--text-secondary);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .datePresetBtn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Highlights whichever preset (if any) exactly matches the two date
+       inputs' current values - see updateDatePresetHighlight. Cleared the
+       moment either input is hand-edited to something else. */
+    .datePresetBtn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* A boxed button that only makes sense once the checkbox/toggle above
+       it is switched on - indented to read as a sub-option rather than a
+       peer layer toggle. Used for "Show flow direction" under Open River
+       Network and "Show only discharging / recent" under Storm Overflows. */
+    .subControlRow {
+      margin-top: 6px;
+      margin-left: 20px;
+    }
+
+    .subToggleBtn {
+      background: none;
+      border: 1px solid var(--border-strong);
+      color: var(--text-secondary);
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .subToggleBtn:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .subToggleBtn.active {
+      background-color: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .subToggleBtn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    /* --- Storm overflow popup: a self-built floating panel rather than
+       Esri's own Popup widget, whose own chrome turned out impossible to
+       theme reliably (its DOM didn't respond to any CSS override tried,
+       consistent with it being sealed off in a shadow root). Built
+       entirely from this app's own --su */
+    .stormPopup {
+      position: absolute;
+      z-index: 20;
+      width: 280px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+      padding: 14px 16px 12px;
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .stormPopup[hidden] {
+      display: none;
+    }
+
+    /* A rotated square, half of it clipped by the card's own edge, giving
+       a diamond "pointer" tip - two of its four borders are removed so
+       only the two facing outward read as an outline, a standard CSS
+       speech-bubble-arrow technique. */
+    .stormPopupArrow {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: var(--surface-1);
+      left: 50%;
+      margin-left: -6px;
+    }
+
+    .stormPopup--below .stormPopupArrow {
+      top: -6px;
+      border-left: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      transform: rotate(45deg);
+    }
+
+    .stormPopup--above .stormPopupArrow {
+      bottom: -6px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      transform: rotate(45deg);
+    }
+
+    .stormPopupCloseBtn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      appearance: none;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 18px;
+      line-height: 1;
+      padding: 2px;
+    }
+
+    .stormPopupCloseBtn:hover {
+      color: var(--text-primary);
+    }
+
+    .stormPopupHeader {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding-right: 20px;
+    }
+
+    .stormPopupGlyph {
+      font-size: 20px;
+      line-height: 1;
+      flex: 0 0 auto;
+      margin-top: 1px;
+    }
+
+    .stormPopupTitleBlock {
+      min-width: 0;
+    }
+
+    .stormPopupCompany {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .stormPopupId {
+      color: var(--text-secondary);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .stormPopupFeeds {
+      color: var(--accent);
+      font-style: italic;
+      font-size: 12.5px;
+      margin-top: 8px;
+    }
+
+    .stormPopupFeeds strong {
+      font-weight: 700;
+    }
+
+    .stormPopupDivider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 10px 0;
+    }
+
+    .stormPopupCard {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: var(--surface-2);
+    }
+
+    .stormPopupDateBadge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      width: 52px;
+      padding: 6px 4px;
+      border-radius: 8px;
+      line-height: 1.15;
+    }
+
+    .stormPopupDateBadgeMonth,
+    .stormPopupDateBadgeYear {
+      display: block;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .stormPopupDateBadgeDay {
+      display: block;
+      font-size: 20px;
+      font-weight: 700;
+      margin: 1px 0;
+    }
+
+    .stormPopupDetails {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .stormPopupHeadlineRow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .stormPopupHeadline {
+      font-weight: 700;
+      font-size: 13.5px;
+    }
+
+    .stormPopupHeadlineGlyph {
+      margin-left: 3px;
+    }
+
+    /* The small dot before "ACTIVE" is a ::before with a solid circle in
+       currentColor, so it always matches the pill's own (category-based)
+       text colour without a separate colour rule of its own. */
+    .stormPopupActivePill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 3px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+
+    .stormPopupActivePill::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .stormPopupTimes {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 6px;
+    }
+
+    .stormPopupTimeCol {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stormPopupTimeLabel {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--text-muted);
+    }
+
+    .stormPopupTimeValue {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .stormPopupDuration {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .stormPopupNoActivity {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+    }
+
+    .stormPopupUpdated {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* One accent colour per status category - shared between the date
+       badge fill, the headline text and (spilling only) the ACTIVE pill,
+       so all three reinforce each other at a glance, same visual-priority
+       idea as the map glyphs themselves. */
+    .stormPopupCard--spilling .stormPopupDateBadge,
+    .stormPopupCard--spilling .stormPopupActivePill { background: var(--storm-spilling-bg); color: var(--storm-spilling); }
+    .stormPopupCard--spilling .stormPopupHeadline { color: var(--storm-spilling); }
+
+    .stormPopupCard--recent .stormPopupDateBadge { background: var(--storm-recent-bg); color: var(--storm-recent); }
+    .stormPopupCard--recent .stormPopupHeadline { color: var(--storm-recent); }
+
+    .stormPopupCard--notspilling .stormPopupDateBadge { background: var(--storm-notspilling-bg); color: var(--storm-notspilling); }
+    .stormPopupCard--notspilling .stormPopupHeadline { color: var(--storm-notspilling); }
+
+    .stormPopupCard--offline .stormPopupDateBadge { background: var(--storm-offline-bg); color: var(--storm-offline); }
+    .stormPopupCard--offline .stormPopupHeadline { color: var(--storm-offline); }
+
     .checkboxRow {
       display: flex;
       align-items: center;
@@ -321,6 +791,19 @@
     .checkboxRow input[type="checkbox"] {
       margin: 0;
       cursor: pointer;
+    }
+
+    /* --- Applied to a .checkboxRow (see updateRiverNetworkAvailability)
+       when its layer's own minScale puts it out of reach at the current
+       zoom - greyed out and inert rather than just carrying an explanatory
+       tooltip, so it's obvious at a glance rather than only on hover. --- */
+    .checkboxRow.scaleDisabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .checkboxRow.scaleDisabled input[type="checkbox"] {
+      cursor: not-allowed;
     }
 
     /* --- Tabs: switch the main content between the map and the league table --- */
@@ -353,14 +836,18 @@
        that actually do anything until an organisation is picked, so this
        calls both out explicitly rather than leaving a new visitor to
        stumble onto them. Dismissible, and disappears on its own once an
-       organisation is selected either way. --- */
+       organisation is selected either way. A full-width strip below
+       #topBar (a plain body child, not nested in the old 320px sidebar
+       column it used to sit in), so no rounded corners/side margins of
+       its own - just a bottom border matching #topBar's, and side
+       padding matching #topBar's own 16px so the text lines up with it. --- */
     .onboardingBanner {
       position: relative;
       background: rgba(57, 135, 229, 0.12);
-      border: 1px solid rgba(57, 135, 229, 0.35);
-      border-radius: 6px;
-      padding: 10px 26px 10px 12px;
-      margin: 12px 0 4px;
+      border: none;
+      border-bottom: 1px solid rgba(57, 135, 229, 0.35);
+      padding: 8px 26px 8px 16px;
+      margin: 0;
       box-sizing: border-box;
     }
 
@@ -413,6 +900,13 @@
       flex-direction: column;
       flex-grow: 1;
       min-width: 0;
+      /* Anchors #stormPopup (a plain sibling of #viewDiv, not injected
+         inside Esri's own view container) - view.toScreen() returns
+         coordinates relative to the view container's top-left, which
+         coincides with #mapColumn's own top-left since #viewDiv is its
+         first child with no padding/border between them, so those
+         coordinates can be used as #stormPopup's left/top directly. */
+      position: relative;
       /* Clicking/dragging on the map (panning, clicking a feature) is a
          mousedown+mouseup over empty space from the browser's point of
          view, which it interprets as a text-selection drag and paints a
@@ -537,6 +1031,88 @@
       padding-top: 12px;
       margin-bottom: 8px;
       color: var(--text-primary);
+    }
+
+    /* --- Contextual layers panel: houses reference-layer toggles (the WFD
+       catchments layer today, more to follow) separately from the
+       organisation-scoped filters above. margin-top: auto pushes it to the
+       bottom of #sidebar's flex column, so it reads as its own "bottom
+       half" section regardless of how tall the filters above happen to
+       be. On narrow/stacked layouts (see the max-width: 700px media query)
+       #sidebar's height is no longer constrained, so this just falls in
+       naturally after the filters instead of sticking to a bottom edge -
+       a reasonable fallback rather than a broken one. --- */
+    #contextualLayersPanel {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    #contextualLayersPanel h3 {
+      font-size: 13px;
+      margin: 0 0 4px;
+      color: var(--text-primary);
+    }
+
+    #contextualLayersPanel .checkboxRow {
+      margin-top: 10px;
+    }
+
+    /* --- Tabs within the contextual layers panel (Layers / Legend) - a
+       separate class from the top-level .tabButton/#tabBar (Map / Site
+       league table) further up, even though it looks the same, because the
+       top-level tab JS selects .tabButton globally: sharing the class
+       would pull these buttons into that logic and vice versa. --- */
+    .contextualTabBar {
+      display: flex;
+      gap: 4px;
+      margin-top: 10px;
+    }
+
+    .contextualTabButton {
+      flex: 1;
+      padding: 6px 4px;
+      font-size: 12px;
+      font-weight: bold;
+      border: 1px solid var(--border-strong);
+      background: var(--surface-2);
+      color: var(--text-secondary);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .contextualTabButton.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    #contextualLayersListTab {
+      margin-top: 4px;
+    }
+
+    #contextualLayersLegendTab {
+      margin-top: 10px;
+    }
+
+    .contextualLegendEmpty {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    /* Same transparent-background treatment as #symbolLegend above, and for
+       the same reason - the Esri Legend widget takes over its container
+       element directly rather than nesting a fresh div inside it. */
+    #contextualLegend .esri-legend {
+      max-width: 100%;
+      font-size: 12px;
+    }
+
+    #contextualLegend,
+    #contextualLegend * {
+      background: transparent !important;
+      box-shadow: none !important;
     }
 
     /* --- Recent surveys: a one-card-at-a-time carousel over the last 5
@@ -1078,6 +1654,23 @@
         min-height: 100%;
       }
 
+      /* Each group stacks full-width rather than wrapping mid-row - a
+         lone floating divider between two wrapped lines reads as a stray
+         mark rather than a separator, so they're hidden here instead. */
+      #topBar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .topBarDivider {
+        display: none;
+      }
+
+      #topBar #orgFilter {
+        width: 100%;
+      }
+
       #appContainer {
         flex-direction: column;
         height: auto;
@@ -1153,8 +1746,42 @@
       "esri/layers/FeatureLayer",
       "esri/layers/GraphicsLayer",
       "esri/Graphic",
-      "esri/widgets/Legend"
-    ], function (Map, MapView, FeatureLayer, GraphicsLayer, Graphic, Legend) {
+      "esri/widgets/Legend",
+      "esri/views/2d/layers/BaseLayerViewGL2D",
+      "esri/core/reactiveUtils"
+    ], function (Map, MapView, FeatureLayer, GraphicsLayer, Graphic, Legend, BaseLayerViewGL2D, reactiveUtils) {
+
+      // ================================================================
+      // WFD-style classification bands for the water quality symbol rings
+      // (see buildLocationsRenderer, further down) - EDIT THRESHOLDS/
+      // COLORS HERE, nothing else needs to change to match.
+      //
+      // Each site's ring color is driven by its average phosphate reading
+      // (phosphateAverage in leagueRows - see recomputeLeagueRows),
+      // independent of whichever metric is currently picked to size/color
+      // the dot itself, so the ring always means the same thing regardless
+      // of what's selected in the sidebar.
+      //
+      // `max` is each band's upper bound in mg/l, exclusive (a value
+      // exactly ON a boundary falls into the band ABOVE it - e.g. exactly
+      // 0.25 is "Good", not "High"); the last band's `max` is null,
+      // meaning no upper bound. Bands must stay listed in ascending
+      // `max` order with the open-ended one last.
+      //
+      // Colors are taken directly from the WFD Waterbody Classification
+      // layer's own ecological_class renderer (catchmentsLayer below;
+      // confirmed via that service's REST ?f=json drawingInfo.renderer -
+      // services3.arcgis.com/.../WFD_River_Water_Body_Catchments_Cycle_4_With_Coastal),
+      // so a ring color always means the same thing here as it does on
+      // that layer.
+      const PHOSPHATE_WFD_BANDS = [
+        { key: "high", label: "High", max: 0.25, color: "#0072b0" },
+        { key: "good", label: "Good", max: 0.5, color: "#56d5e8" },
+        { key: "moderate", label: "Moderate", max: 0.75, color: "#e6b800" },
+        { key: "poor", label: "Poor", max: 1, color: "#f08c00" },
+        { key: "bad", label: "Bad", max: null, color: "#d63129" }
+      ];
+      // ================================================================
 
       const BASE_URL = "https://services3.arcgis.com/Bb8lfThdhugyc4G3/arcgis/rest/services/National_River_Survey_Testing_Layer/FeatureServer";
 
@@ -1177,7 +1804,7 @@
 
       const THEME_MAP_COLORS = {
         dark: {
-          organisationOutline: [195, 194, 183, 0.45],
+          organisationOutline: [230, 229, 220, 0.9],
           allSitesMarker: "#8f8d86",
           markerOutline: "#ffffff"
         },
@@ -1186,7 +1813,7 @@
           // at low opacity (the dark set's look) would all but disappear
           // against light gray canvas, so the organisation boundary and
           // every point's outline go dark instead of light here.
-          organisationOutline: [90, 88, 80, 0.55],
+          organisationOutline: [35, 33, 28, 0.85],
           allSitesMarker: "#8f8d86",
           markerOutline: "#2a2a27"
         }
@@ -1201,6 +1828,20 @@
       // rather than removed entirely, since a transparent fill (unlike no
       // fill symbol at all) still lets clicks on the polygon's interior
       // register as hits, not just clicks on the outline itself.
+      //
+      // The outline itself is bright/high-opacity (rather than the quiet,
+      // low-opacity gray this used to be), so it reads clearly against
+      // either basemap instead of blending into the background context.
+      //
+      // The outline's width isn't fixed - a "size" visualVariable targeting
+      // the outline (Esri's documented mechanism for scale-driven outline
+      // width: https://developers.arcgis.com/javascript/latest/visualization/best-practices/scale/)
+      // drives it from $view.scale instead, so it's thinner at zoomed-out
+      // scales (where a fixed width would otherwise look disproportionately
+      // thick relative to the small on-screen shape) and a bit bolder once
+      // zoomed in close enough to see individual boundaries clearly. Stops
+      // must stay in ascending order by scale value; anything beyond the
+      // first/last stop just clamps to that stop's size.
       function buildOrganisationRenderer(theme) {
         return {
           type: "simple",
@@ -1208,16 +1849,582 @@
             type: "simple-fill",
             color: [0, 0, 0, 0],
             outline: {
-              // A quiet neutral gray at reduced opacity rather than the
-              // bright accent blue used for selection/highlight elsewhere
-              // - the boundary should read as background context, not a
-              // call to action.
               color: THEME_MAP_COLORS[theme].organisationOutline,
-              width: 1.2
+              width: 1.4
             }
-          }
+          },
+          visualVariables: [{
+            type: "size",
+            target: "outline",
+            valueExpression: "$view.scale",
+            stops: [
+              { value: 50000, size: 1.6 },
+              { value: 250000, size: 1.2 },
+              { value: 1000000, size: 0.8 },
+              { value: 5000000, size: 0.4 },
+              { value: 20000000, size: 0.2 }
+            ]
+          }]
         };
       }
+
+      // --- Open River Network's line symbology: replaces the service's own
+      //     default (color-coded by "form" - River/Tidal River/Canal/Lake)
+      //     with a single fixed blue whose WIDTH is instead driven by
+      //     Strahler stream order (a measure of how many tributaries feed
+      //     into a given stretch - 1 for a headwater trickle, up towards
+      //     7 for a major river built from many joining branches), via a
+      //     "size" visualVariable on the "Strahler" field: thin (0.4pt) at
+      //     order 1, thickening up to 5pt at order 7. A SizeVariable's
+      //     stops list is capped at 6, one short of the 7 orders actually
+      //     present, so order 6 is left out and gets its width by linear
+      //     interpolation between the order-5 and order-7 stops rather than
+      //     its own explicit entry - close enough to not be visible as a
+      //     gap in the ramp. Paired with a fixed glow (see setTheme) the
+      //     same way the organisation boundary got one earlier. ---
+      // Line-width-by-Strahler-order stops, in CSS pixels - shared with
+      // riverFlowHalfWidthForStrahler below so the animated flow trail's
+      // own width ramp always matches this line's, rather than the two
+      // drifting apart if one is ever retuned on its own.
+      const RIVER_WIDTH_STOPS_BY_STRAHLER = [
+        { value: 1, size: 0.4 },
+        { value: 2, size: 0.8 },
+        { value: 3, size: 1.3 },
+        { value: 4, size: 2 },
+        { value: 5, size: 3 },
+        { value: 7, size: 5 }
+      ];
+
+      // The river network's line color used to switch with the theme (a
+      // near-cyan "#4fc3f7" in dark mode, this deeper blue in light mode),
+      // on the idea that the near-cyan would read better against a dark
+      // basemap. In practice this light-mode blue (paired with the animated
+      // flow trail on top of it) looked good in both themes, so it's now
+      // used unconditionally rather than picked per-theme - see
+      // buildRiverNetworkRenderer and the drop-shadow effect in setTheme,
+      // both of which used to branch on `theme` for this and no longer do.
+      const RIVER_NETWORK_LINE_COLOR = "#0277bd";
+
+      function buildRiverNetworkRenderer() {
+        return {
+          type: "simple",
+          symbol: {
+            type: "simple-line",
+            color: RIVER_NETWORK_LINE_COLOR,
+            cap: "round",
+            join: "round"
+          },
+          visualVariables: [{
+            type: "size",
+            field: "Strahler",
+            stops: RIVER_WIDTH_STOPS_BY_STRAHLER
+          }]
+        };
+      }
+
+      // --- "Show flow direction" - an animated overlay of flowing light
+      //     trails drawn on top of riverNetworkLayer, moving from each
+      //     segment's first digitized vertex towards its last. That
+      //     digitized order is safe to treat as true downstream flow: a
+      //     direct query against the live Open River Network service
+      //     (Sept 2026) showed its own `flow` field reads "in direction"
+      //     for 182,723 of 182,731 segments (99.996%, the rest "unknown")
+      //     - i.e. this "topologically corrected" dataset's lines are
+      //     already digitized start-to-end in the actual flow direction
+      //     for essentially every segment, so the trail can just follow
+      //     that order with no Fnode/Tnode lookup.
+      //
+      //     A regular FeatureLayer renderer/symbol can't animate, so this
+      //     is a second, custom WebGL layer (RiverFlowLayer/
+      //     RiverFlowLayerView, adapted from Esri's own "Animated lines
+      //     with WebGL" sample) drawn on top of riverNetworkLayer. Two
+      //     changes from a first attempt at this that broke the whole
+      //     dashboard (blank map, no controls working):
+      //      1. The matrix/vector math the sample gets from the gl-matrix
+      //         library is reimplemented as the tiny mat3Helper/vec2Helper
+      //         objects just below instead of loading gl-matrix from a
+      //         CDN - if that request had been blocked or slow, every
+      //         piece of code below would have thrown ReferenceErrors on
+      //         load, which lines up with what broke last time.
+      //      2. riverFlowLayer is added to the map with map.layers.add()
+      //         AFTER the view is already up and running (see the
+      //         try/catch around that call, below the view's own
+      //         construction), not listed in the Map's initial `layers`
+      //         array - so if this layer fails to initialize for any
+      //         other reason, it fails on its own rather than taking the
+      //         whole page down with it.
+      //
+      //     It only ever holds whatever river segments are visible in the
+      //     current view extent - refreshRiverFlowGraphics() re-queries
+      //     riverNetworkLayer for that extent whenever the view stops
+      //     moving, rather than ever trying to hold the whole
+      //     182,731-segment network at once. ---
+
+      // Minimal replacements for the handful of gl-matrix mat3/vec2/vec3
+      // functions RiverFlowLayerView needs (see the big comment above) -
+      // same column-major 3x3 layout and argument order as gl-matrix 2.x,
+      // just inlined so nothing has to load from a CDN. Float32Array
+      // (not a plain array) matters here: updatePositions below calls
+      // .set() on a couple of these, which only plain TypedArrays have.
+      const mat3Helper = {
+        create: function () { return new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]); },
+        identity: function (out) {
+          out[0] = 1; out[1] = 0; out[2] = 0;
+          out[3] = 0; out[4] = 1; out[5] = 0;
+          out[6] = 0; out[7] = 0; out[8] = 1;
+          return out;
+        },
+        fromValues: function (m00, m01, m02, m10, m11, m12, m20, m21, m22) {
+          return new Float32Array([m00, m01, m02, m10, m11, m12, m20, m21, m22]);
+        },
+        translate: function (out, a, v) {
+          const a00 = a[0], a01 = a[1], a02 = a[2];
+          const a10 = a[3], a11 = a[4], a12 = a[5];
+          const a20 = a[6], a21 = a[7], a22 = a[8];
+          const x = v[0], y = v[1];
+          out[0] = a00; out[1] = a01; out[2] = a02;
+          out[3] = a10; out[4] = a11; out[5] = a12;
+          out[6] = x * a00 + y * a10 + a20;
+          out[7] = x * a01 + y * a11 + a21;
+          out[8] = x * a02 + y * a12 + a22;
+          return out;
+        },
+        rotate: function (out, a, rad) {
+          const a00 = a[0], a01 = a[1], a02 = a[2];
+          const a10 = a[3], a11 = a[4], a12 = a[5];
+          const a20 = a[6], a21 = a[7], a22 = a[8];
+          const s = Math.sin(rad), c = Math.cos(rad);
+          out[0] = c * a00 + s * a10;
+          out[1] = c * a01 + s * a11;
+          out[2] = c * a02 + s * a12;
+          out[3] = c * a10 - s * a00;
+          out[4] = c * a11 - s * a01;
+          out[5] = c * a12 - s * a02;
+          out[6] = a20; out[7] = a21; out[8] = a22;
+          return out;
+        },
+        scale: function (out, a, v) {
+          const x = v[0], y = v[1];
+          out[0] = x * a[0]; out[1] = x * a[1]; out[2] = x * a[2];
+          out[3] = y * a[3]; out[4] = y * a[4]; out[5] = y * a[5];
+          out[6] = a[6]; out[7] = a[7]; out[8] = a[8];
+          return out;
+        }
+      };
+      const vec2Helper = {
+        create: function () { return new Float32Array(2); },
+        fromValues: function (x, y) { return new Float32Array([x, y]); },
+        sub: function (out, a, b) {
+          out[0] = a[0] - b[0];
+          out[1] = a[1] - b[1];
+          return out;
+        }
+      };
+      const vec3Helper = {
+        fromValues: function (x, y, z) { return new Float32Array([x, y, z]); }
+      };
+
+      // The animated trail's width (in CSS pixels) tracks the same
+      // Strahler-order ramp riverNetworkLine's own line width does
+      // (RIVER_WIDTH_STOPS_BY_STRAHLER above), plus a fixed overhang on
+      // top of it - see riverFlowHalfWidthForStrahler below - so it reads
+      // as a highlight halo a bit wider than the line underneath at every
+      // river size. A single flat width here used to look fine on thin
+      // headwater streams but all but vanished on the widest rivers, where
+      // it ended up the same width as (and, worse, the same colour as) the
+      // line it sat on top of. RIVER_FLOW_HIGHLIGHT_COLOR is deliberately
+      // not that same blue for the same reason: a same-colour trail only
+      // reads as different from the line where it's wider than the line,
+      // a contrasting colour reads as different everywhere.
+      //
+      // The other three constants give the trail its motion: TRAIL_SPEED
+      // is how many map units of "distance along the line" the bright part
+      // advances per second, TRAIL_LENGTH is how much of that distance is
+      // lit up at once, and TRAIL_CYCLE is the gap (in the same units)
+      // before the pattern repeats along a given line. All of this is just
+      // a starting point for the look of the animation - safe to tune to
+      // taste.
+      const RIVER_FLOW_EXTRA_WIDTH = 3;
+      const RIVER_FLOW_HIGHLIGHT_COLOR = [255, 255, 255];
+      const RIVER_FLOW_TRAIL_SPEED = 120;
+      const RIVER_FLOW_TRAIL_LENGTH = 250;
+      const RIVER_FLOW_TRAIL_CYCLE = 900;
+
+      // The animated trail's half-width in CSS pixels for a given Strahler
+      // order: linearly interpolates RIVER_WIDTH_STOPS_BY_STRAHLER the same
+      // way Esri's own "size" visualVariable does (clamping to the
+      // first/last stop outside its range), adds RIVER_FLOW_EXTRA_WIDTH,
+      // then halves it since extrudeLinesIntoBuffers below extrudes each
+      // side of the line by a HALF-width. Falls back to the order-1 (the
+      // narrowest) width if a segment has no Strahler value at all.
+      function riverFlowHalfWidthForStrahler(strahler) {
+        const stops = RIVER_WIDTH_STOPS_BY_STRAHLER;
+        let fullWidth = stops[0].size;
+        if (typeof strahler === "number") {
+          if (strahler >= stops[stops.length - 1].value) {
+            fullWidth = stops[stops.length - 1].size;
+          } else if (strahler > stops[0].value) {
+            for (let i = 0; i < stops.length - 1; i++) {
+              if (strahler >= stops[i].value && strahler <= stops[i + 1].value) {
+                const t = (strahler - stops[i].value) / (stops[i + 1].value - stops[i].value);
+                fullWidth = stops[i].size + t * (stops[i + 1].size - stops[i].size);
+                break;
+              }
+            }
+          }
+        }
+        return (fullWidth + RIVER_FLOW_EXTRA_WIDTH) / 2;
+      }
+
+      // However zoomed out the view gets (up to riverNetworkLayer's own
+      // minScale), refreshRiverFlowGraphics stops adding more segments
+      // once it's collected this many - building and animating a mesh for
+      // an unbounded number of on-screen segments could stall the browser,
+      // and this still leaves the busiest views with a (partial) animation
+      // rather than none at all.
+      const RIVER_FLOW_MAX_SEGMENTS = 8000;
+
+      // Turns one query-result feature's geometry into the flat vertex/
+      // index buffers the GPU needs: two extruded vertices (one on either
+      // side of the true line, offset by the mitred normal - the same
+      // technique Esri's sample uses) per original vertex, stitched into
+      // triangle pairs, with a running "distance travelled along the
+      // line" written into each vertex for the fragment shader to animate
+      // against. Restarts that running distance at 0 for each part of a
+      // multi-part polyline (rare for a river network, but not impossible)
+      // so a trail never appears to jump between unconnected parts.
+      function extrudeLinesIntoBuffers(graphics, center) {
+        let vtxCount = 0;
+        let idxCount = 0;
+        for (let i = 0; i < graphics.length; ++i) {
+          const paths = graphics[i].geometry.paths;
+          for (let p = 0; p < paths.length; ++p) {
+            vtxCount += paths[p].length * 2;
+            idxCount += (paths[p].length - 1) * 6;
+          }
+        }
+
+        const vertexData = new ArrayBuffer(7 * vtxCount * 4);
+        const floatData = new Float32Array(vertexData);
+        const colorData = new Uint8Array(vertexData);
+        const indexData = new Uint16Array(idxCount);
+
+        let vtxCursor = 0;
+        let idxCursor = 0;
+
+        function emitVertexPair(current, offset, distance, color) {
+          floatData[vtxCursor * 7 + 0] = current[0] - center[0];
+          floatData[vtxCursor * 7 + 1] = current[1] - center[1];
+          floatData[vtxCursor * 7 + 2] = offset[0];
+          floatData[vtxCursor * 7 + 3] = offset[1];
+          floatData[vtxCursor * 7 + 4] = distance;
+          floatData[vtxCursor * 7 + 5] = +1;
+          colorData[4 * (vtxCursor * 7 + 6) + 0] = color[0];
+          colorData[4 * (vtxCursor * 7 + 6) + 1] = color[1];
+          colorData[4 * (vtxCursor * 7 + 6) + 2] = color[2];
+          colorData[4 * (vtxCursor * 7 + 6) + 3] = 255;
+
+          floatData[vtxCursor * 7 + 7] = current[0] - center[0];
+          floatData[vtxCursor * 7 + 8] = current[1] - center[1];
+          floatData[vtxCursor * 7 + 9] = -offset[0];
+          floatData[vtxCursor * 7 + 10] = -offset[1];
+          floatData[vtxCursor * 7 + 11] = distance;
+          floatData[vtxCursor * 7 + 12] = -1;
+          colorData[4 * (vtxCursor * 7 + 13) + 0] = color[0];
+          colorData[4 * (vtxCursor * 7 + 13) + 1] = color[1];
+          colorData[4 * (vtxCursor * 7 + 13) + 2] = color[2];
+          colorData[4 * (vtxCursor * 7 + 13) + 3] = 255;
+          vtxCursor += 2;
+        }
+
+        for (let i = 0; i < graphics.length; ++i) {
+          const paths = graphics[i].geometry.paths;
+          const color = graphics[i].attributes.color;
+          // Set per-graphic by refreshRiverFlowGraphics from the segment's
+          // own Strahler order - see riverFlowHalfWidthForStrahler - so a
+          // wide river's trail is wider than a headwater trickle's, same as
+          // riverNetworkLine's own line width is.
+          const halfWidth = graphics[i].attributes.halfWidth;
+
+          for (let p = 0; p < paths.length; ++p) {
+            const path = paths[p];
+            let current = null;
+            let normal = null;
+            let distance = 0;
+
+            for (let j = 0; j < path.length; ++j) {
+              const point = path[j];
+
+              if (current) {
+                const delta = [point[0] - current[0], point[1] - current[1]];
+                const deltaLength = Math.sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
+                const direction = [delta[0] / deltaLength, delta[1] / deltaLength];
+                const nextNormal = [-direction[1], direction[0]];
+
+                let offset;
+                if (normal) {
+                  offset = [normal[0] + nextNormal[0], normal[1] + nextNormal[1]];
+                  const offsetLength = Math.sqrt(offset[0] * offset[0] + offset[1] * offset[1]);
+                  offset[0] /= offsetLength;
+                  offset[1] /= offsetLength;
+                  const d = normal[0] * offset[0] + normal[1] * offset[1];
+                  offset[0] /= d;
+                  offset[1] /= d;
+                } else {
+                  offset = nextNormal;
+                }
+
+                emitVertexPair(current, [offset[0] * halfWidth, offset[1] * halfWidth], distance, color);
+
+                if (j >= 2) {
+                  indexData[idxCursor + 0] = vtxCursor - 4;
+                  indexData[idxCursor + 1] = vtxCursor - 3;
+                  indexData[idxCursor + 2] = vtxCursor - 2;
+                  indexData[idxCursor + 3] = vtxCursor - 3;
+                  indexData[idxCursor + 4] = vtxCursor - 1;
+                  indexData[idxCursor + 5] = vtxCursor - 2;
+                  idxCursor += 6;
+                }
+
+                normal = nextNormal;
+                distance += deltaLength;
+              }
+
+              current = point;
+            }
+
+            emitVertexPair(current, [normal[0] * halfWidth, normal[1] * halfWidth], distance, color);
+            indexData[idxCursor + 0] = vtxCursor - 4;
+            indexData[idxCursor + 1] = vtxCursor - 3;
+            indexData[idxCursor + 2] = vtxCursor - 2;
+            indexData[idxCursor + 3] = vtxCursor - 3;
+            indexData[idxCursor + 4] = vtxCursor - 1;
+            indexData[idxCursor + 5] = vtxCursor - 2;
+            idxCursor += 6;
+          }
+        }
+
+        return { vertexData: vertexData, indexData: indexData };
+      }
+
+      const RiverFlowLayerView = BaseLayerViewGL2D.createSubclass({
+        aPosition: 0,
+        aOffset: 1,
+        aDistance: 2,
+        aSide: 3,
+        aColor: 4,
+
+        constructor: function () {
+          this.transform = mat3Helper.create();
+          this.extrude = mat3Helper.create();
+          this.translationToCenter = vec2Helper.create();
+          this.screenTranslation = vec2Helper.create();
+          this.display = mat3Helper.fromValues(NaN, 0, 0, 0, NaN, 0, -1, 1, 1);
+          this.screenScaling = vec3Helper.fromValues(NaN, NaN, 1);
+          this.needsUpdate = false;
+        },
+
+        attach: function () {
+          const gl = this.context;
+
+          const requestUpdate = () => {
+            this.needsUpdate = true;
+            this.requestRender();
+          };
+          this.watcher = reactiveUtils.on(() => this.layer.graphics, "change", requestUpdate);
+
+          const vertexSource = `
+              precision highp float;
+              uniform mat3 u_transform;
+              uniform mat3 u_extrude;
+              uniform mat3 u_display;
+              attribute vec2 a_position;
+              attribute vec2 a_offset;
+              attribute float a_distance;
+              attribute float a_side;
+              attribute vec4 a_color;
+              varying float v_distance;
+              varying float v_side;
+              varying vec4 v_color;
+              void main(void) {
+                gl_Position.xy = (u_display * (u_transform * vec3(a_position, 1.0) + u_extrude * vec3(a_offset, 0.0))).xy;
+                gl_Position.zw = vec2(0.0, 1.0);
+                v_distance = a_distance;
+                v_side = a_side;
+                v_color = a_color;
+              }`;
+
+          // TRAIL_SPEED/LENGTH/CYCLE mirror the tunable constants above -
+          // GLSL can't read JS consts, so they're inlined as literals here.
+          const fragmentSource = `
+              precision highp float;
+              uniform float u_current_time;
+              varying float v_distance;
+              varying float v_side;
+              varying vec4 v_color;
+              const float TRAIL_SPEED = ${RIVER_FLOW_TRAIL_SPEED.toFixed(1)};
+              const float TRAIL_LENGTH = ${RIVER_FLOW_TRAIL_LENGTH.toFixed(1)};
+              const float TRAIL_CYCLE = ${RIVER_FLOW_TRAIL_CYCLE.toFixed(1)};
+              void main(void) {
+                float d = mod(v_distance - u_current_time * TRAIL_SPEED, TRAIL_CYCLE);
+                float a1 = d < TRAIL_LENGTH ? mix(0.0, 1.0, d / TRAIL_LENGTH) : 0.0;
+                float a2 = exp(-abs(v_side) * 3.0);
+                float a = a1 * a2;
+                gl_FragColor = v_color * a;
+              }`;
+
+          const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+          gl.shaderSource(vertexShader, vertexSource);
+          gl.compileShader(vertexShader);
+          const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+          gl.shaderSource(fragmentShader, fragmentSource);
+          gl.compileShader(fragmentShader);
+
+          this.program = gl.createProgram();
+          gl.attachShader(this.program, vertexShader);
+          gl.attachShader(this.program, fragmentShader);
+          gl.bindAttribLocation(this.program, this.aPosition, "a_position");
+          gl.bindAttribLocation(this.program, this.aOffset, "a_offset");
+          gl.bindAttribLocation(this.program, this.aDistance, "a_distance");
+          gl.bindAttribLocation(this.program, this.aSide, "a_side");
+          gl.bindAttribLocation(this.program, this.aColor, "a_color");
+          gl.linkProgram(this.program);
+          gl.deleteShader(vertexShader);
+          gl.deleteShader(fragmentShader);
+
+          this.uTransform = gl.getUniformLocation(this.program, "u_transform");
+          this.uExtrude = gl.getUniformLocation(this.program, "u_extrude");
+          this.uDisplay = gl.getUniformLocation(this.program, "u_display");
+          this.uCurrentTime = gl.getUniformLocation(this.program, "u_current_time");
+
+          this.vertexBuffer = gl.createBuffer();
+          this.indexBuffer = gl.createBuffer();
+          this.indexBufferSize = 0;
+
+          if (gl.getParameter(gl.VERSION).startsWith("WebGL 2.0")) {
+            this.vao = gl.createVertexArray();
+            this.bindVertexArray = (vao) => gl.bindVertexArray(vao);
+            this.deleteVertexArray = (vao) => gl.deleteVertexArray(vao);
+          } else {
+            const vaoExt = gl.getExtension("OES_vertex_array_object");
+            this.vao = vaoExt.createVertexArrayOES();
+            this.bindVertexArray = (vao) => vaoExt.bindVertexArrayOES(vao);
+            this.deleteVertexArray = (vao) => vaoExt.deleteVertexArrayOES(vao);
+          }
+
+          this.bindVertexArray(this.vao);
+          gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+          gl.enableVertexAttribArray(this.aPosition);
+          gl.enableVertexAttribArray(this.aOffset);
+          gl.enableVertexAttribArray(this.aDistance);
+          gl.enableVertexAttribArray(this.aSide);
+          gl.enableVertexAttribArray(this.aColor);
+          gl.vertexAttribPointer(this.aPosition, 2, gl.FLOAT, false, 28, 0);
+          gl.vertexAttribPointer(this.aOffset, 2, gl.FLOAT, false, 28, 8);
+          gl.vertexAttribPointer(this.aDistance, 1, gl.FLOAT, false, 28, 16);
+          gl.vertexAttribPointer(this.aSide, 1, gl.FLOAT, false, 28, 20);
+          gl.vertexAttribPointer(this.aColor, 4, gl.UNSIGNED_BYTE, true, 28, 24);
+          this.bindVertexArray(null);
+
+          this.centerAtLastUpdate = vec2Helper.fromValues(this.view.state.center[0], this.view.state.center[1]);
+        },
+
+        detach: function () {
+          this.watcher.remove();
+          const gl = this.context;
+          gl.deleteBuffer(this.vertexBuffer);
+          gl.deleteBuffer(this.indexBuffer);
+          this.deleteVertexArray(this.vao);
+          gl.deleteProgram(this.program);
+        },
+
+        render: function (renderParameters) {
+          const gl = renderParameters.context;
+          const state = renderParameters.state;
+
+          this.updatePositions(renderParameters);
+
+          if (this.indexBufferSize === 0) {
+            return;
+          }
+
+          mat3Helper.identity(this.transform);
+          this.screenTranslation[0] = (state.pixelRatio * state.size[0]) / 2;
+          this.screenTranslation[1] = (state.pixelRatio * state.size[1]) / 2;
+          mat3Helper.translate(this.transform, this.transform, this.screenTranslation);
+          mat3Helper.rotate(this.transform, this.transform, (Math.PI * state.rotation) / 180);
+          this.screenScaling[0] = state.pixelRatio / state.resolution;
+          this.screenScaling[1] = -state.pixelRatio / state.resolution;
+          mat3Helper.scale(this.transform, this.transform, this.screenScaling);
+          mat3Helper.translate(this.transform, this.transform, this.translationToCenter);
+
+          mat3Helper.identity(this.extrude);
+          mat3Helper.rotate(this.extrude, this.extrude, (Math.PI * state.rotation) / 180);
+          // Width is no longer scaled here - it's baked into each vertex's
+          // own offset in extrudeLinesIntoBuffers instead (see
+          // riverFlowHalfWidthForStrahler), so every river's trail can have
+          // its own width. This still needs the y-flip to orient the
+          // offset correctly on screen.
+          mat3Helper.scale(this.extrude, this.extrude, [1, -1, 1]);
+
+          this.display[0] = 2 / (state.pixelRatio * state.size[0]);
+          this.display[4] = -2 / (state.pixelRatio * state.size[1]);
+
+          gl.useProgram(this.program);
+          gl.uniformMatrix3fv(this.uTransform, false, this.transform);
+          gl.uniformMatrix3fv(this.uExtrude, false, this.extrude);
+          gl.uniformMatrix3fv(this.uDisplay, false, this.display);
+          gl.uniform1f(this.uCurrentTime, performance.now() / 1000.0);
+          this.bindVertexArray(this.vao);
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+          gl.drawElements(gl.TRIANGLES, this.indexBufferSize, gl.UNSIGNED_SHORT, 0);
+
+          // Keeps the animation running - each rendered frame schedules
+          // the next one, rather than only redrawing when the map itself
+          // changes.
+          this.requestRender();
+        },
+
+        updatePositions: function (renderParameters) {
+          const stationary = renderParameters.stationary;
+          const state = renderParameters.state;
+          const gl = renderParameters.context;
+
+          if (!stationary) {
+            vec2Helper.sub(this.translationToCenter, this.centerAtLastUpdate, state.center);
+            this.requestRender();
+            return;
+          }
+
+          if (!this.needsUpdate && this.translationToCenter[0] === 0 && this.translationToCenter[1] === 0) {
+            return;
+          }
+
+          this.centerAtLastUpdate.set(state.center);
+          this.translationToCenter[0] = 0;
+          this.translationToCenter[1] = 0;
+          this.needsUpdate = false;
+
+          const graphics = this.layer.graphics.items;
+          const buffers = extrudeLinesIntoBuffers(graphics, this.centerAtLastUpdate);
+
+          gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+          gl.bufferData(gl.ARRAY_BUFFER, buffers.vertexData, gl.STATIC_DRAW);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+          gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, buffers.indexData, gl.STATIC_DRAW);
+          this.indexBufferSize = buffers.indexData.length;
+        }
+      });
+
+      const RiverFlowLayer = GraphicsLayer.createSubclass({
+        createLayerView: function (view) {
+          if (view.type === "2d") {
+            return new RiverFlowLayerView({ view: view, layer: this });
+          }
+        }
+      });
 
       const MARKER_COLOR = "#e8590c";
 
@@ -1263,6 +2470,17 @@
           parseInt(clean.substring(4, 6), 16),
           alpha
         ];
+      }
+
+      // Same idea as hexToRgbArray above, just as a CSS rgba() string -
+      // for plain DOM/CSS styling (the phosphate stat box's background,
+      // see updateStatsForPrimary) rather than an Esri graphic symbol.
+      function hexToRgba(hex, alpha) {
+        const clean = hex.replace("#", "");
+        const r = parseInt(clean.substring(0, 2), 16);
+        const g = parseInt(clean.substring(2, 4), 16);
+        const b = parseInt(clean.substring(4, 6), 16);
+        return "rgba(" + r + ", " + g + ", " + b + ", " + alpha + ")";
       }
 
       // A soft colored ring around a selected site's point - deliberately
@@ -1369,43 +2587,260 @@
         return "Decode($feature.locationID, " + cases.join(", ") + ", null)";
       }
 
-      // Builds the locations renderer. With no field, no rows, or a
-      // degenerate domain (every visible site sharing the same value)
-      // every point is a fixed size; otherwise a `size` visual variable -
-      // driven by the Arcade Decode expression above, not a literal field,
-      // since the value being sized by is a live client-side computation -
-      // scales each point between minSize and maxSize across the field's
-      // min/max for whatever's currently on screen. The ArcGIS Legend
-      // widget renders a normal size ramp for an Arcade-expression visual
-      // variable exactly as it would for a field-based one, so switching
-      // to this didn't cost the automatic legend.
-      function buildLocationsRenderer(field, rows, minVal, maxVal, color) {
-        const symbol = {
-          type: "simple-marker",
-          style: "circle",
-          color: color || MARKER_COLOR,
-          size: 8,
-          outline: {
-            color: THEME_MAP_COLORS[currentTheme].markerOutline,
-            width: 1
-          }
-        };
+      // Shared prefix for the two phosphate-WFD Arcade expressions below
+      // (the renderer's band key, for the ring color/symbol selection, and
+      // the band's numeric rank, for band-based sizing) - same "compute
+      // the shared value once, each consumer decides what to return" idea
+      // as buildStormOverflowCategoryLogic elsewhere in this file. Always
+      // keyed to phosphateAverage specifically, regardless of whichever
+      // metric the caller actually wants rendered - see the comment on
+      // PHOSPHATE_WFD_BANDS at the top of the file for why.
+      function buildPhosphateWfdBandLogic(rows) {
+        return "var value = " + buildArcadeDecodeExpression("phosphateAverage", rows) + ";\n  ";
+      }
 
-        if (!field || !rows || rows.length === 0 || minVal === null || minVal === undefined || maxVal === null || maxVal === undefined || minVal === maxVal) {
-          return { type: "simple", symbol: symbol };
+      // The band's own key ("high"/"good"/.../"bad") - used as the
+      // phosphate renderer's valueExpression, matched against each
+      // uniqueValueInfos entry's `value` below to pick that band's ring
+      // color. Bands are checked in ascending `max` order and the first
+      // match wins, so a value exactly on a boundary falls into the band
+      // above it; the final band (max: null) is unconditional, catching
+      // everything past the last threshold. A site with no phosphate
+      // reading in range at all returns "none", which isn't one of
+      // PHOSPHATE_WFD_BANDS' own keys - see buildLocationsRenderer's
+      // defaultSymbol for how that's handled.
+      function buildPhosphateWfdBandArcade(rows) {
+        const lines = [buildPhosphateWfdBandLogic(rows) + "if (IsEmpty(value)) { return \"none\"; }"];
+        PHOSPHATE_WFD_BANDS.forEach(function (band) {
+          lines.push(band.max === null
+            ? "return \"" + band.key + "\";"
+            : "if (value < " + band.max + ") { return \"" + band.key + "\"; }");
+        });
+        return lines.join("\n  ");
+      }
+
+      // The band's zero-based rank in PHOSPHATE_WFD_BANDS (0 = High ... 4
+      // = Bad) - used only as the phosphate SIZE visual variable's driving
+      // value (see buildLocationsRenderer), so a site sizes up through the
+      // exact same bands its ring color already reflects: Bad biggest,
+      // High smallest, regardless of how far into "Bad" territory its
+      // actual reading is. A site with no phosphate reading returns null,
+      // the same "fall back to the base symbol's size" convention
+      // buildArcadeDecodeExpression's Decode default relies on elsewhere.
+      function buildPhosphateWfdBandRankArcade(rows) {
+        const lines = [buildPhosphateWfdBandLogic(rows) + "if (IsEmpty(value)) { return null; }"];
+        PHOSPHATE_WFD_BANDS.forEach(function (band, index) {
+          lines.push(band.max === null
+            ? "return " + index + ";"
+            : "if (value < " + band.max + ") { return " + index + "; }");
+        });
+        return lines.join("\n  ");
+      }
+
+      // Plain-JS mirror of the branching above, for spots (like the
+      // phosphate stat box) that need to classify one already-known JS
+      // number directly rather than a Feature's attributes through
+      // Arcade. Returns the matching PHOSPHATE_WFD_BANDS entry, or null
+      // when there's nothing to classify.
+      function phosphateWfdBandForValue(value) {
+        if (value === null || value === undefined) return null;
+        for (let i = 0; i < PHOSPHATE_WFD_BANDS.length; i++) {
+          const band = PHOSPHATE_WFD_BANDS[i];
+          if (band.max === null || value < band.max) return band;
+        }
+        return null;
+      }
+
+      // Scale stops for the water quality symbols' dot size - same
+      // "$view.scale" technique, and the same 5 reference scales, as
+      // buildOrganisationRenderer's outline-width stops above, just tuned
+      // for small point markers rather than polygon boundaries. Holds the
+      // min/max stops for the dot itself (see the nested minSize/maxSize
+      // SizeVariables below - the officially documented way to combine
+      // scale-based and data-driven sizing:
+      // https://developers.arcgis.com/javascript/latest/visualization/best-practices/scale/) -
+      // shared by every metric's continuous sizing AND phosphate's
+      // band-rank sizing, so a dot is always the same size range at a
+      // given zoom level regardless of which metric picked it.
+      const LOCATION_MARKER_SCALE_STOPS = {
+        dot: [
+          { value: 50000, min: 5, max: 22 },
+          { value: 250000, min: 4, max: 18 },
+          { value: 1000000, min: 3, max: 13 },
+          { value: 5000000, min: 2, max: 9 },
+          { value: 20000000, min: 1.5, max: 6 }
+        ]
+      };
+
+      // Static legend-swatch sizes for the phosphate bands - purely
+      // cosmetic, so the Legend widget's "Phosphate WFD class" entries
+      // read High (smallest) through Bad (largest) at a glance without
+      // also showing the separate numeric size ramp Esri would otherwise
+      // add for a data-driven size visual variable (see
+      // buildLocationsRenderer's legendOptions: {showLegend: false}).
+      // Interpolated across LOCATION_MARKER_SCALE_STOPS.dot's own
+      // "1:250,000" min/max (a reasonable reference/mid zoom) so the
+      // legend roughly matches what that zoom level actually looks like,
+      // rather than being tuned separately and drifting out of sync.
+      const PHOSPHATE_BAND_LEGEND_SIZES = (function () {
+        const ref = LOCATION_MARKER_SCALE_STOPS.dot.find(function (s) { return s.value === 250000; }) || LOCATION_MARKER_SCALE_STOPS.dot[0];
+        const count = PHOSPHATE_WFD_BANDS.length;
+        return PHOSPHATE_WFD_BANDS.map(function (band, i) {
+          const t = count === 1 ? 0 : i / (count - 1);
+          return ref.min + t * (ref.max - ref.min);
+        });
+      })();
+
+      // Builds a "size" visual variable driven by `valueExpression`
+      // between `domainMin`/`domainMax`, with the min/max PIXEL sizes
+      // themselves scale-dependent (LOCATION_MARKER_SCALE_STOPS.dot) - the
+      // shared plumbing behind both a metric's ordinary continuous sizing
+      // and phosphate's discrete band-rank sizing below, so the two only
+      // ever differ in what they're driven by, not how scale is applied.
+      // `hideLegend` suppresses this specific visual variable's own
+      // ramp from the Legend widget (used for phosphate's band-rank
+      // variable - see PHOSPHATE_BAND_LEGEND_SIZES above for why) without
+      // affecting how it actually sizes points on the map.
+      function buildScaleAwareSizeVisualVariable(valueExpression, domainMin, domainMax, hideLegend) {
+        const dotSizeStops = LOCATION_MARKER_SCALE_STOPS.dot;
+        const visualVariable = {
+          type: "size",
+          valueExpression: valueExpression,
+          minDataValue: domainMin,
+          maxDataValue: domainMax,
+          minSize: { type: "size", valueExpression: "$view.scale", stops: dotSizeStops.map(function (s) { return { value: s.value, size: s.min }; }) },
+          maxSize: { type: "size", valueExpression: "$view.scale", stops: dotSizeStops.map(function (s) { return { value: s.value, size: s.max }; }) }
+        };
+        if (hideLegend) visualVariable.legendOptions = { showLegend: false };
+        return visualVariable;
+      }
+
+      // Fixed-size (no data domain at all) but still scale-aware - same
+      // stops as buildScaleAwareSizeVisualVariable, just without a data
+      // value driving where in that range a point falls, so every point
+      // ends up at the top of the range for the current scale.
+      function buildFixedScaleSizeVisualVariable() {
+        return {
+          type: "size",
+          valueExpression: "$view.scale",
+          stops: LOCATION_MARKER_SCALE_STOPS.dot.map(function (s) { return { value: s.value, size: s.max }; })
+        };
+      }
+
+      // Builds the locations renderer. Phosphate is the one metric with
+      // WFD band styling (see PHOSPHATE_WFD_BANDS at the top of the file):
+      // a unique-value renderer keyed on buildPhosphateWfdBandArcade, with
+      // each band's own FILL color (rather than the usual single metric
+      // color) AND a size driven by that same band's rank (Bad biggest,
+      // High smallest - buildPhosphateWfdBandRankArcade) rather than by
+      // where its raw reading falls within this org's min/max, so a
+      // site's size means the same thing everywhere, not just relative to
+      // what's currently on screen. "none" (no phosphate reading at all)
+      // falls through to defaultSymbol's ordinary phosphate-blue look.
+      // Every OTHER metric keeps the original plain look: a single fixed
+      // fill color, sized continuously between this org's min/max for
+      // that metric - WFD bands are a phosphate-specific idea, not a
+      // general water-quality one. Both cases share the same plain,
+      // fixed-width outline and stay scale-aware via
+      // LOCATION_MARKER_SCALE_STOPS for the dot itself.
+      function buildLocationsRenderer(field, rows, minVal, maxVal, color) {
+        const hasRows = rows && rows.length > 0;
+        const isPhosphate = field === "phosphateAverage";
+        const hasDataDomain = field && hasRows && minVal !== null && minVal !== undefined && maxVal !== null && maxVal !== undefined && minVal !== maxVal;
+
+        function baseSymbol(size, fillColor) {
+          return {
+            type: "simple-marker",
+            style: "circle",
+            color: fillColor || color || MARKER_COLOR,
+            size: size || 8,
+            outline: { color: THEME_MAP_COLORS[currentTheme].markerOutline, width: 1 }
+          };
+        }
+
+        // A hollow ring - transparent fill, same-style outline as every
+        // other point - used for a site with no reading at all for
+        // whichever metric is currently selected. Deliberately styled to
+        // look nothing like any actual reading (a solid dot in some
+        // "neutral" color could still be mistaken for a real, if unusual,
+        // value) rather than blending in with the lowest real band/value.
+        function noDataSymbol(size) {
+          return {
+            type: "simple-marker",
+            style: "circle",
+            color: [0, 0, 0, 0],
+            size: size || 8,
+            outline: { color: THEME_MAP_COLORS[currentTheme].markerOutline, width: 1.5 }
+          };
+        }
+
+        if (hasRows && isPhosphate) {
+          return {
+            type: "unique-value",
+            valueExpression: buildPhosphateWfdBandArcade(rows),
+            valueExpressionTitle: "Phosphate Class",
+            uniqueValueInfos: PHOSPHATE_WFD_BANDS.map(function (band, i) {
+              return {
+                value: band.key,
+                label: band.label,
+                symbol: baseSymbol(PHOSPHATE_BAND_LEGEND_SIZES[i], band.color)
+              };
+            }),
+            defaultSymbol: noDataSymbol(),
+            defaultLabel: "No phosphate data",
+            visualVariables: [
+              buildScaleAwareSizeVisualVariable(buildPhosphateWfdBandRankArcade(rows), 0, PHOSPHATE_WFD_BANDS.length - 1, true)
+            ]
+          };
+        }
+
+        // Every other metric: no WFD bands to pick a fill from, just one
+        // fixed color - so "no data" is handled with a color visual
+        // variable instead of a unique-value renderer's own
+        // defaultSymbol (which would also drag in a redundant categorical
+        // legend entry alongside the numeric size ramp these metrics
+        // already show, the exact duplication phosphate's legend used to
+        // have). The base symbol IS the hollow "no data" look; this
+        // variable fills it in with the metric's real color, but only for
+        // a site that actually has a reading.
+        if (hasRows && field) {
+          const resolvedColor = color || MARKER_COLOR;
+          const sizeVisualVariable = hasDataDomain
+            ? buildScaleAwareSizeVisualVariable(buildArcadeDecodeExpression(field, rows), minVal, maxVal)
+            : buildFixedScaleSizeVisualVariable();
+
+          return {
+            type: "simple",
+            symbol: noDataSymbol(),
+            visualVariables: [
+              sizeVisualVariable,
+              // Both stops share the same color - this app sizes these
+              // metrics rather than color-ramping them, so this isn't a
+              // real gradient, just "fill it in" for anything Decode
+              // actually finds a value for. A site with no reading falls
+              // through Decode to null and is left alone, keeping
+              // noDataSymbol's hollow fill - same null-means-fall-back-
+              // to-the-symbol convention the size variable above already
+              // relies on. legendOptions hides this from the Legend
+              // widget since a flat two-stop ramp has nothing useful to
+              // show - the size ramp above already covers this metric.
+              {
+                type: "color",
+                valueExpression: buildArcadeDecodeExpression(field, rows),
+                stops: [
+                  { value: hasDataDomain ? minVal : 0, color: resolvedColor },
+                  { value: hasDataDomain ? maxVal : 1, color: resolvedColor }
+                ],
+                legendOptions: { showLegend: false }
+              }
+            ]
+          };
         }
 
         return {
           type: "simple",
-          symbol: symbol,
-          visualVariables: [{
-            type: "size",
-            valueExpression: buildArcadeDecodeExpression(field, rows),
-            minDataValue: minVal,
-            maxDataValue: maxVal,
-            minSize: 6,
-            maxSize: 28
-          }]
+          symbol: baseSymbol(),
+          visualVariables: [buildFixedScaleSizeVisualVariable()]
         };
       }
 
@@ -1432,17 +2867,16 @@
         renderer: buildLocationsRenderer(null, null, null, null)
       });
 
-      // --- "All site locations" reference layer: every site belonging to
-      //     the selected organisation, survey or no survey, as small
-      //     uniform gray dots - purely a visual reference (not clickable;
-      //     the click handler below only ever looks for a hit on
-      //     `locationsLayer`) that the user can turn on/off, since
-      //     `locationsLayer` above now hides any site with zero surveys in
-      //     range. Drawn BELOW `locationsLayer` in the map's layer order
-      //     so a surveyed site shows its normal colored/sized dot on top
-      //     of this layer's small gray one underneath, rather than the two
-      //     competing. Hidden by default; toggled via the sidebar
-      //     checkbox - see showAllSitesToggle. ---
+      // --- "Sites yet to be surveyed" reference layer: the selected
+      //     organisation's sites that have had ZERO surveys in the current
+      //     date range - i.e. exactly the sites `locationsLayer` above is
+      //     leaving out (see applyAllSitesFilter) - as small uniform gray
+      //     dots. Purely a visual reference (not clickable; the click
+      //     handler below only ever looks for a hit on `locationsLayer`).
+      //     Drawn BELOW `locationsLayer` in the map's layer order, though
+      //     the two shouldn't ever overlap given they're complementary
+      //     sets. Hidden by default; toggled via the sidebar checkbox -
+      //     see showAllSitesToggle. ---
       function buildAllSitesRenderer(theme) {
         const t = THEME_MAP_COLORS[theme];
         return {
@@ -1469,6 +2903,449 @@
         url: BASE_URL + "/2"
       });
 
+      // --- Optional reference layer: the Environment Agency's WFD (Water
+      //     Framework Directive) river water body catchments, cycle 4 -
+      //     https://www.arcgis.com/home/item.html?id=224fe92b95a9495082a8922bd39eccbc
+      //     A separate public hosted layer (not part of BASE_URL's
+      //     service), so it's its own FeatureLayer. No renderer is set
+      //     here deliberately - the service already ships a meaningful
+      //     unique-value renderer (color per ecological_class: High/Good/
+      //     Moderate/Poor/Bad/Coastal/Not assessed), so using it as-is
+      //     both looks right immediately and stays correct if the
+      //     Environment Agency ever revises those colors upstream.
+      //     opacity is turned down to 0.4 (60% transparent) so it reads as
+      //     background context under the organisation boundary/points
+      //     rather than competing with them. popupEnabled is off - this is
+      //     a pure visual reference layer, with its own details available
+      //     via the Legend tab instead of a click popup - which also means
+      //     the click handler below (already only reacting to hits on
+      //     locationsLayer/organisationLayer) never needs to consider it.
+      //     Hidden by default; toggled via the sidebar checkbox - see
+      //     catchmentsLayerToggle. ---
+      const catchmentsLayer = new FeatureLayer({
+        url: "https://services3.arcgis.com/Bb8lfThdhugyc4G3/arcgis/rest/services/WFD_River_Water_Body_Catchments_Cycle_4_With_Coastal/FeatureServer/0",
+        outFields: ["water_body_name", "water_body_type", "ecological_class", "chemical_class", "management_catchment", "classification_year"],
+        visible: false,
+        opacity: 0.4,
+        popupEnabled: false,
+        // Matches the sidebar checkbox's own label so the legend entry
+        // (see updateLegendLayers/contextualLegend) reads the same as the
+        // toggle that switched it on.
+        title: "WFD Waterbody Classification 2025 (Ecological)"
+      });
+
+      // --- Optional reference layer: the Open River Network (ORN) with
+      //     CaBA ID -
+      //     https://www.arcgis.com/home/item.html?id=fd2f3ec65ec54203b99eb04335b160eb
+      //     Topologically-corrected river centerlines for Great Britain
+      //     (derived from OS Open Rivers, ~183k polylines), a separate
+      //     public hosted layer from the same publisher as the WFD
+      //     catchments layer above. Symbolized by Strahler stream order
+      //     rather than the service's own default ("form") renderer - see
+      //     buildRiverNetworkRenderer, reapplied whenever the theme changes
+      //     (same as organisationLayer) since its color is themed too.
+      //     "Strahler" has to stay in outFields so that renderer has the
+      //     field it needs. popupEnabled is off, in keeping with every
+      //     other contextual/reference layer in this panel being a pure
+      //     visual backdrop rather than a click target. Hidden by default;
+      //     toggled via the sidebar checkbox - see riverNetworkLayerToggle.
+      //
+      //     minScale: 1000000 keeps it from drawing at national/GB-wide
+      //     zoom levels - the service itself has no scale restriction, and
+      //     with ~183k features nationwide that's both too heavy and too
+      //     visually cluttered to be useful zoomed all the way out. It
+      //     switches on once you're zoomed in past roughly a 1:1,000,000
+      //     view (a bit past where buildOrganisationRenderer's own
+      //     scale-based outline width stops calls "quite zoomed out" - see
+      //     that function's visualVariables stops). maxScale is left at 0
+      //     (no limit), so it stays visible all the way in. The sidebar
+      //     checkbox is greyed out and disabled outside that range instead
+      //     of just relying on a tooltip - see updateRiverNetworkAvailability,
+      //     watching view.scale below.
+      const riverNetworkLayer = new FeatureLayer({
+        url: "https://services3.arcgis.com/Bb8lfThdhugyc4G3/arcgis/rest/services/OpenRiverNetwork_CaBA_ID/FeatureServer/0",
+        outFields: ["name1", "form", "flow", "Strahler", "CaBA_Partnership"],
+        visible: false,
+        popupEnabled: false,
+        minScale: 1000000,
+        renderer: buildRiverNetworkRenderer(),
+        // Matches the sidebar checkbox's own label so the legend entry
+        // (see updateLegendLayers/contextualLegend) reads the same as the
+        // toggle that switched it on.
+        title: "Open River Network"
+      });
+
+      // Empty until "Show flow direction" is switched on and populated by
+      // refreshRiverFlowGraphics - see the big comment above RiverFlowLayer.
+      // Deliberately NOT added to map.layers here - see the try/catch
+      // around map.layers.add(riverFlowLayer) just after the view is
+      // constructed below, and the comment above RiverFlowLayerView for
+      // why that matters.
+      const riverFlowLayer = new RiverFlowLayer({ visible: false });
+
+      // --- Optional reference layer: "Storm Overflows" - live discharge
+      //     status for UK water companies' storm overflow outfalls, merged
+      //     from several identically-schemad ArcGIS feature services (one
+      //     per water company) into what reads in the sidebar as a single
+      //     layer/legend entry, same "one merged layer" approach as
+      //     riverNetworkLayer's own single Open River Network toggle.
+      //
+      //     Almost every one of these services shares the same fields:
+      //     `Status` (-1 = offline/no data, 0 = not currently discharging,
+      //     1 = currently discharging) and `LatestEventEnd` (when the last
+      //     discharge stopped). buildStormOverflowCategoryArcade(fields)
+      //     turns those two into one of four categories
+      //     buildStormOverflowRenderer then symbolizes: currently
+      //     discharging, discharged in the last 48 hours, not discharged
+      //     in the last 48 hours, and offline/no data.
+      //
+      //     A couple of the ten don't quite match that schema (NEH_outlets
+      //     _PROD uses camelCase field names throughout; STREAM_Data's
+      //     end-of-discharge field is actually named LatestEventFinish,
+      //     with LatestEventEnd only as its alias, which Arcade/outFields
+      //     can't use) - see STORM_OVERFLOW_DEFAULT_FIELDS and the `fields`
+      //     override on individual STORM_OVERFLOW_SOURCES entries below.
+      //     Add more companies later just by appending their FeatureServer
+      //     URL to STORM_OVERFLOW_SOURCES below (with a `fields` override
+      //     only if that service's field names differ from the defaults) -
+      //     the renderer, refresh, legend entry and sidebar toggle are all
+      //     shared and need no further changes.
+      //
+      //     refreshInterval (minutes) makes each layer re-fetch its own
+      //     features on its own on that schedule, matching how often the
+      //     underlying services say they update (~10 minutes) closely
+      //     enough without any custom polling/timer code here. Hidden by
+      //     default; toggled via the sidebar checkbox - see
+      //     stormOverflowToggle. Unlike every other layer in this
+      //     dashboard, this one DOES have popups enabled - see
+      //     buildStormOverflowPopupTemplate below for why. ---
+      // Emoji glyphs rather than colored dots/circles, deliberately - this
+      // needs to read as clearly different from the water quality metric
+      // markers (locationsLayer/allSitesLayer, both circles sized by
+      // value) at a glance, not just a different circle color. The 1F4A9
+      // "currently discharging" glyph matches the convention public
+      // storm-overflow trackers (e.g. the Rivers Trust's "Top of the
+      // Poops") already use, so it should read as immediately familiar
+      // rather than novel. ️ (variation selector-16) after ⚠ forces
+      // its colour emoji form rather than the plain monochrome glyph some
+      // fonts default a bare U+26A0 to. The two states that most need
+      // attention (currently discharging, discharged recently) render at
+      // STORM_OVERFLOW_ICON_SIZE_LARGE; the calmer states (not discharged,
+      // offline) stay at STORM_OVERFLOW_ICON_SIZE_SMALL so they don't
+      // compete with the two that matter more - see buildStormOverflowRenderer.
+      const STORM_OVERFLOW_GLYPHS = {
+        spilling: "\u{1F4A9}",
+        recent: "⚠️",
+        notspilling: "✅",
+        offline: "❓"
+      };
+      const STORM_OVERFLOW_ICON_SIZE_LARGE = 20;
+      const STORM_OVERFLOW_ICON_SIZE_SMALL = 8;
+
+      // Shared branching logic between buildStormOverflowCategoryArcade
+      // (the renderer's raw category key, below) and
+      // buildStormOverflowPriorityArcade (draw-order priority) - both need
+      // the exact same status/latest-discharge-end rules, so this fragment
+      // is generated once per layer's own field names and reused by each
+      // rather than keeping copies in sync by hand. (The popup itself is
+      // now hand-built in plain JS/DOM rather than Esri's Popup widget -
+      // see stormOverflowCategoryFromAttributes further down, which
+      // reimplements this same branching directly against a graphic's
+      // already-loaded attributes instead of Arcade.) Takes a `fields`
+      // object (see STORM_OVERFLOW_DEFAULT_FIELDS below)
+      // because a couple of the ten source services don't use the same
+      // Status/LatestEventEnd field names as the rest. Written with
+      // nested if statements rather than IIf() specifically so DateDiff()
+      // is only ever reached once latestEnd has already been confirmed
+      // non-empty - Arcade's IIf() evaluates both of its branches eagerly,
+      // so it would throw on every feature with no recorded discharge yet
+      // if used here instead.
+      function buildStormOverflowCategoryLogic(fields) {
+        return `
+          var status = $feature.${fields.status};
+          var latestEnd = $feature.${fields.latestEventEnd};
+          var category = "offline";
+
+          if (!IsEmpty(status)) {
+            if (status == 1) {
+              category = "spilling";
+            } else if (status == 0) {
+              category = "notspilling";
+              if (!IsEmpty(latestEnd)) {
+                var hoursSinceEnd = DateDiff(Now(), latestEnd, "hours");
+                if (hoursSinceEnd >= 0 && hoursSinceEnd <= 48) {
+                  category = "recent";
+                }
+              }
+            }
+          }
+        `;
+      }
+
+      function buildStormOverflowCategoryArcade(fields) {
+        return buildStormOverflowCategoryLogic(fields) + `
+          return category;
+        `;
+      }
+
+      // Feeds each storm overflow layer's `orderBy` (see the FeatureLayer
+      // construction below, order: "descending") rather than the renderer
+      // or popup - draw order rather than colour or text. The highest
+      // number needs to sort FIRST (descending) to end up visually on top
+      // wherever points overlap - confirmed by testing, and the opposite
+      // of a simple "drawn last wins" assumption. That gives exactly the
+      // priority asked for: currently discharging on top of everything,
+      // then discharged in the last 48 hours, then offline, with not
+      // discharged - the calmest, least urgent state - at the very bottom
+      // of the stack.
+      function buildStormOverflowPriorityArcade(fields) {
+        return buildStormOverflowCategoryLogic(fields) + `
+          if (category == "spilling") { return 3; }
+          if (category == "recent") { return 2; }
+          if (category == "offline") { return 1; }
+          return 0;
+        `;
+      }
+
+      // A plain TextSymbol (type: "text") used directly as a renderer's
+      // point symbol turned out not to render at all through FeatureLayer's
+      // fast WebGL point-drawing pipeline (the same one every other point
+      // layer here uses) - the query kept firing and returning real
+      // features (confirmed in devtools), the symbols just silently never
+      // painted. A tiny rasterized SVG per category, used as an ordinary
+      // picture-marker (exactly the same symbol type as any custom-icon
+      // FeatureLayer), sidesteps that: it's an image like any other, not a
+      // live text glyph, so it goes through the same well-supported path
+      // as everything else on the map. No fill/stroke styling here - every
+      // glyph is now a full colour emoji, which ignores SVG fill/stroke
+      // anyway. `size` sets the rendered picture-marker's width/height in
+      // px - see STORM_OVERFLOW_ICON_SIZE_LARGE/SMALL above.
+      function stormOverflowGlyphSymbol(glyph, size) {
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">` +
+          `<text x="16" y="23" font-size="24" font-weight="bold" ` +
+          `font-family="Arial, &apos;Segoe UI Emoji&apos;, &apos;Noto Color Emoji&apos;, sans-serif" ` +
+          `text-anchor="middle">${glyph}</text></svg>`;
+        return {
+          type: "picture-marker",
+          url: "data:image/svg+xml," + encodeURIComponent(svg),
+          width: size,
+          height: size
+        };
+      }
+
+      function buildStormOverflowRenderer(fields) {
+        return {
+          type: "unique-value",
+          valueExpression: buildStormOverflowCategoryArcade(fields),
+          valueExpressionTitle: "Storm overflow status",
+          uniqueValueInfos: [
+            { value: "spilling", label: "Currently discharging", symbol: stormOverflowGlyphSymbol(STORM_OVERFLOW_GLYPHS.spilling, STORM_OVERFLOW_ICON_SIZE_LARGE) },
+            { value: "recent", label: "Discharged in last 48 hours", symbol: stormOverflowGlyphSymbol(STORM_OVERFLOW_GLYPHS.recent, STORM_OVERFLOW_ICON_SIZE_LARGE) },
+            { value: "notspilling", label: "Not discharged in last 48 hours", symbol: stormOverflowGlyphSymbol(STORM_OVERFLOW_GLYPHS.notspilling, STORM_OVERFLOW_ICON_SIZE_SMALL) },
+            { value: "offline", label: "Offline", symbol: stormOverflowGlyphSymbol(STORM_OVERFLOW_GLYPHS.offline, STORM_OVERFLOW_ICON_SIZE_SMALL) }
+          ],
+          defaultSymbol: stormOverflowGlyphSymbol(STORM_OVERFLOW_GLYPHS.offline, STORM_OVERFLOW_ICON_SIZE_SMALL),
+          defaultLabel: "Unknown"
+        };
+      }
+
+      // Human-readable headline text per category, used by the custom
+      // popup card below - kept as its own lookup rather than an Arcade
+      // expression since this popup's content is built as plain JS/DOM,
+      // not an Esri PopupTemplate.
+      const STORM_OVERFLOW_STATUS_HEADLINES = {
+        spilling: "Discharging Now",
+        recent: "Discharged in last 48 hours",
+        notspilling: "Not discharged in last 48 hours",
+        offline: "Offline"
+      };
+
+      // Same branching rules as buildStormOverflowCategoryLogic's Arcade,
+      // reimplemented in plain JS against a graphic's already-loaded
+      // attributes - the popup needs to pick a category (for colour,
+      // headline and glyph) synchronously while building DOM, so it isn't
+      // worth round-tripping through an Arcade evaluation just for that.
+      // Date fields come back from FeatureLayer as epoch-ms numbers, same
+      // as everywhere else attributes are read directly in this file.
+      function stormOverflowCategoryFromAttributes(attrs, fields) {
+        const status = attrs[fields.status];
+        const latestEnd = attrs[fields.latestEventEnd];
+        let category = "offline";
+        if (status !== null && status !== undefined) {
+          if (status === 1) {
+            category = "spilling";
+          } else if (status === 0) {
+            category = "notspilling";
+            if (latestEnd !== null && latestEnd !== undefined) {
+              const hoursSinceEnd = (Date.now() - latestEnd) / (60 * 60 * 1000);
+              if (hoursSinceEnd >= 0 && hoursSinceEnd <= 48) {
+                category = "recent";
+              }
+            }
+          }
+        }
+        return category;
+      }
+
+      // "9:45 am" - lowercase am/pm, no seconds, used for a completed
+      // event's Started/Ended columns.
+      function stormOverflowFormatTime(ms) {
+        if (ms === null || ms === undefined) return null;
+        return new Date(ms)
+          .toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+          .replace(/AM|PM/i, function (m) { return m.toLowerCase(); });
+      }
+
+      // "08/09/2026 7:25 am" - used for an ONGOING discharge's single
+      // "Started" line, which (unlike a completed event's two-column
+      // Started/Ended) needs the date as well as the time since there's
+      // no second value alongside it to carry that context.
+      function stormOverflowFormatFullDateTime(ms) {
+        if (ms === null || ms === undefined) return null;
+        const d = new Date(ms);
+        const pad = function (n) { return String(n).padStart(2, "0"); };
+        return pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + " " + stormOverflowFormatTime(ms);
+      }
+
+      // Badge shows the date a discharge event started (falling back to
+      // when the record was last updated for outfalls with no recent
+      // event at all) as a stacked month/day/year.
+      function stormOverflowFormatDateBadge(ms) {
+        if (ms === null || ms === undefined) return null;
+        const d = new Date(ms);
+        return { month: d.toLocaleDateString([], { month: "short" }), day: d.getDate(), year: d.getFullYear() };
+      }
+
+      // For a COMPLETED discharge (fixed start and end): "NN mins"
+      // under an hour, "Xh" / "Xh YYm" from an hour up.
+      function stormOverflowFormatCompletedDuration(startMs, endMs) {
+        if (!startMs || !endMs) return null;
+        const minutes = Math.max(0, Math.round((endMs - startMs) / (60 * 1000)));
+        if (minutes < 60) return String(minutes).padStart(2, "0") + " mins";
+        const hours = Math.floor(minutes / 60);
+        const remainder = minutes % 60;
+        return remainder === 0 ? hours + "h" : hours + "h " + String(remainder).padStart(2, "0") + "m";
+      }
+
+      // For an ONGOING discharge, measured against right now rather than
+      // a fixed end time - "4 hours 27 mins 05 secs" - and re-run every
+      // second while such a popup is open (see stormPopupTickIntervalId)
+      // so it visibly ticks up like the reference design's live counter.
+      function stormOverflowFormatLiveDuration(startMs) {
+        const totalSeconds = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        const parts = [];
+        if (hours > 0) parts.push(hours + (hours === 1 ? " hour" : " hours"));
+        parts.push(minutes + (minutes === 1 ? " min" : " mins"));
+        parts.push(String(seconds).padStart(2, "0") + " secs");
+        return parts.join(" ");
+      }
+
+      // Field names shared by most of the ten source services. Individual
+      // STORM_OVERFLOW_SOURCES entries below only need a `fields` override
+      // for whichever names actually differ from this. `id` (a short
+      // per-outfall reference code, e.g. "SWS00513") is the one field
+      // beyond the original seven the custom popup needs for its
+      // subtitle - every one of the ten source services turned out to
+      // already have it under this exact name, so no source needs to
+      // override it.
+      const STORM_OVERFLOW_DEFAULT_FIELDS = {
+        id: "Id",
+        company: "Company",
+        status: "Status",
+        statusStart: "StatusStart",
+        latestEventStart: "LatestEventStart",
+        latestEventEnd: "LatestEventEnd",
+        receivingWaterCourse: "ReceivingWaterCourse",
+        lastUpdated: "LastUpdated"
+      };
+
+      const STORM_OVERFLOW_SOURCES = [
+        { url: "https://services-eu1.arcgis.com/MSNNjkZ51iVh8yBj/arcgis/rest/services/Northumbrian_Water_Storm_Overflow_Activity_2_view/FeatureServer/0" },
+        { url: "https://services3.arcgis.com/VCOY1atHWVcDlvlJ/arcgis/rest/services/stream_service_outfall_locations_view/FeatureServer/0" },
+        { url: "https://services1.arcgis.com/NO7lTIlnxRMMG9Gw/arcgis/rest/services/Severn_Trent_Water_Storm_Overflow_Activity/FeatureServer/0" },
+        { url: "https://services-eu1.arcgis.com/6qJmARkS2dt2IjVA/arcgis/rest/services/SouthernWater_StormOverflowActivity_PROD_view/FeatureServer/0" },
+        {
+          // Only one of the ten with camelCase field names throughout
+          // rather than the PascalCase every other source uses.
+          url: "https://services-eu1.arcgis.com/OMdMOtfhATJPcHe3/arcgis/rest/services/NEH_outlets_PROD/FeatureServer/0",
+          fields: {
+            company: "company",
+            status: "status",
+            statusStart: "statusStart",
+            latestEventStart: "latestEventStart",
+            latestEventEnd: "latestEventEnd",
+            receivingWaterCourse: "receivingWaterCourse",
+            lastUpdated: "lastUpdated"
+          }
+        },
+        { url: "https://services2.arcgis.com/g6o32ZDQ33GpCIu3/arcgis/rest/services/Thames_Water_Storm_Overflow_Activity_(Production)_view/FeatureServer/0" },
+        { url: "https://services5.arcgis.com/5eoLvR0f8HKb7HWP/arcgis/rest/services/United_Utilities_Storm_Overflow_Activity/FeatureServer/0" },
+        { url: "https://services.arcgis.com/3SZ6e0uCvPROr4mS/arcgis/rest/services/Wessex_Water_Storm_Overflow_Activity/FeatureServer/0" },
+        { url: "https://services-eu1.arcgis.com/1WqkK5cDKUbF0CkH/arcgis/rest/services/Yorkshire_Water_Storm_Overflow_Activity/FeatureServer/0" },
+        {
+          // Matches the standard schema everywhere except the
+          // end-of-discharge timestamp: the real field here is
+          // LatestEventFinish - LatestEventEnd only exists as its display
+          // alias, which Arcade/outFields can't reference.
+          url: "https://services-eu1.arcgis.com/zat3uNEZelYVksuM/arcgis/rest/services/STREAM_Data/FeatureServer/0",
+          fields: { latestEventEnd: "LatestEventFinish" }
+        }
+      ];
+
+      const stormOverflowLayers = STORM_OVERFLOW_SOURCES.map(function (source, index) {
+        const fields = Object.assign({}, STORM_OVERFLOW_DEFAULT_FIELDS, source.fields || {});
+        const layer = new FeatureLayer({
+          url: source.url,
+          outFields: [fields.id, fields.company, fields.status, fields.statusStart, fields.latestEventStart, fields.latestEventEnd, fields.receivingWaterCourse, fields.lastUpdated],
+          visible: false,
+          // Popups are hand-built (see #stormPopup and openStormPopup)
+          // rather than Esri's own Popup widget, whose chrome turned out
+          // impossible to theme reliably - see the big comment above
+          // .stormPopup in the stylesheet. popupEnabled stays false, same
+          // as every other layer here; the click handling that opens the
+          // custom popup hit-tests these layers directly instead.
+          popupEnabled: false,
+          // Overrides whatever scale range each underlying service happens
+          // to define, rather than trusting all ten to leave it unset.
+          // SouthernWater_StormOverflowActivity_PROD_view's own service
+          // definition sets minScale to ~964641, so without this override
+          // that one company's outfalls silently disappeared once zoomed
+          // out past roughly county level - explicitly forcing 0 (Esri's
+          // "no restriction" value) here keeps every company visible at
+          // every zoom, matching how this is presented as one merged
+          // layer/toggle in the sidebar.
+          minScale: 0,
+          maxScale: 0,
+          refreshInterval: 5,
+          renderer: buildStormOverflowRenderer(fields),
+          // See the comment above buildStormOverflowPriorityArcade -
+          // controls which icon wins when two outfalls overlap on screen,
+          // not query order. Descending, not ascending - confirmed by
+          // testing that the highest-priority value needs to sort FIRST
+          // to end up drawn on top (the opposite of a simple "drawn last
+          // wins" painter's model).
+          orderBy: [{ valueExpression: buildStormOverflowPriorityArcade(fields), order: "descending" }],
+          // Only the first of these needs its own legend entry -
+          // updateLegendLayers only ever passes stormOverflowLayers[0] to
+          // the contextual Legend widget, so the other nine would
+          // otherwise just be duplicating it.
+          legendEnabled: index === 0,
+          // Matches the sidebar checkbox's own label so the legend entry
+          // reads the same as the toggle that switched it on.
+          title: "Storm Overflows"
+        });
+        // Stashed (under a name that can't collide with any real Esri
+        // FeatureLayer property, e.g. its own .fields schema property) so
+        // buildStormOverflowFilterExpression can generate correct SQL for
+        // this specific layer later, without a second parallel array to
+        // keep in sync with stormOverflowLayers by index.
+        layer._stormOverflowFields = fields;
+        return layer;
+      });
+
       const BASEMAP_BY_THEME = { dark: "dark-gray-vector", light: "gray-vector" };
 
       // Holds a selection ring (see buildCompareRingSymbol) for every
@@ -1481,18 +3358,27 @@
 
       const map = new Map({
         basemap: BASEMAP_BY_THEME[currentTheme],
-        layers: [organisationLayer, allSitesLayer, locationsLayer, compareRingLayer]
+        // catchmentsLayer sits directly above the basemap (bottom-most
+        // operational layer), with organisationLayer above that so its
+        // boundary sits behind the river lines rather than covering them,
+        // and riverNetworkLayer above that so the river centerlines draw
+        // over both, with the storm overflow outfall points above that
+        // again - survey points and compare rings stay fully visible drawn
+        // on top of everything. riverFlowLayer (the "Show flow direction"
+        // animation) is added separately, after the view is up - see the
+        // try/catch around map.layers.add(riverFlowLayer) below.
+        layers: [catchmentsLayer, organisationLayer, riverNetworkLayer, ...stormOverflowLayers, allSitesLayer, locationsLayer, compareRingLayer]
       });
 
       // Sets the map's basemap from the two independent choices that
       // affect it: the imagery toggle overrides the theme's basemap
       // entirely when on ("hybrid" = imagery with road/place labels, more
-      // useful for a river survey map than plain unlabeled satellite);
+      // useful for a river survey map than plain unlabeled satellite - however, at the moment it is satellite);
       // otherwise it's whichever gray reference basemap matches the
       // current theme. Called by setTheme() (a theme change) and by the
       // imagery button's own click handler below.
       function applyBasemap() {
-        map.basemap = useImageryBasemap ? "hybrid" : BASEMAP_BY_THEME[currentTheme];
+        map.basemap = useImageryBasemap ? "satellite" : BASEMAP_BY_THEME[currentTheme];
       }
 
       // Kept as constants so we can return to this starting view later
@@ -1506,6 +3392,18 @@
         center: INITIAL_CENTER,
         zoom: INITIAL_ZOOM
       });
+
+      // Added after the view is already up and running, deliberately kept
+      // out of the Map's own `layers` list above, and wrapped in its own
+      // try/catch - if this custom WebGL layer fails to initialize for any
+      // reason, the rest of the dashboard (every other layer, every
+      // button) is completely unaffected. See the big comment above
+      // RiverFlowLayerView for the failure this is guarding against.
+      try {
+        map.layers.add(riverFlowLayer);
+      } catch (err) {
+        console.error("Flow-direction animation failed to initialize; continuing without it.", err);
+      }
 
       // --- Imagery basemap toggle, as a button on the map itself (top
       //     right, an empty corner - zoom sits top-left by default) rather
@@ -1595,13 +3493,24 @@
         layerInfos: []
       });
 
+      // Separate Legend widget instance (same view, own container/state)
+      // for the contextual layers panel's "Legend" tab - kept apart from
+      // the water quality metric legend above so switching a reference
+      // layer like catchments on/off never touches what the metric legend
+      // is showing, and vice versa. See updateLegendLayers.
+      const contextualLegend = new Legend({
+        view: view,
+        container: "contextualLegend",
+        layerInfos: []
+      });
+
       const orgFilter = document.getElementById("orgFilter");
-      const locationCount = document.getElementById("locationCount");
       const metricListLabel = document.getElementById("metricListLabel");
       const metricListEl = document.getElementById("metricList");
       const symbolLegend = document.getElementById("symbolLegend");
       const dateRangeLabel = document.getElementById("dateRangeLabel");
       const dateRangeRow = document.getElementById("dateRangeRow");
+      const dateRangePresets = document.getElementById("dateRangePresets");
       const dateFromInput = document.getElementById("dateFrom");
       const dateToInput = document.getElementById("dateTo");
       const dateRangeClearBtn = document.getElementById("dateRangeClear");
@@ -1611,6 +3520,271 @@
       showAllSitesToggle.addEventListener("change", function () {
         allSitesLayer.visible = showAllSitesToggle.checked;
       });
+
+      // WFD river catchments toggle - independent of the organisation
+      // selection, so wired up here rather than gated by
+      // updateMetricPanelVisibility like showAllSitesRow above. Its legend
+      // entry lives in the contextual layers panel's own Legend tab (see
+      // updateLegendLayers), not the water quality metric legend, so no
+      // other panel's visibility needs to react to this checkbox.
+      const catchmentsLayerToggle = document.getElementById("catchmentsLayerToggle");
+      catchmentsLayerToggle.addEventListener("change", function () {
+        catchmentsLayer.visible = catchmentsLayerToggle.checked;
+        updateLegendLayers();
+      });
+
+      // Open River Network toggle - same independent-of-organisation
+      // wiring as the catchments toggle just above, and its own legend
+      // entry in the contextual layers panel's Legend tab (see
+      // updateLegendLayers).
+      const riverNetworkLayerToggle = document.getElementById("riverNetworkLayerToggle");
+      const riverNetworkLayerRow = document.getElementById("riverNetworkLayerRow");
+      riverNetworkLayerToggle.addEventListener("change", function () {
+        riverNetworkLayer.visible = riverNetworkLayerToggle.checked;
+        // "Show flow direction" only means anything with the network
+        // itself switched on - see updateRiverNetworkAvailability for the
+        // matching scale-based half of this same disabled state.
+        flowDirectionToggle.disabled = !riverNetworkLayerToggle.checked || riverNetworkLayerToggle.disabled;
+        refreshRiverFlowGraphics();
+        updateLegendLayers();
+      });
+
+      // "Show flow direction" sub-toggle - see refreshRiverFlowGraphics and
+      // the big comment above RiverFlowLayer for what this actually does.
+      // A boxed button (same subToggleBtn style as "Show only discharging /
+      // recent" under Storm Overflows) rather than a checkbox, so its own
+      // on/off state lives in flowDirectionActive instead of `.checked` -
+      // native `:disabled` styling on the button itself replaces the old
+      // scaleDisabled row class for greying it out.
+      const flowDirectionToggle = document.getElementById("flowDirectionToggle");
+      let flowDirectionActive = false;
+      flowDirectionToggle.addEventListener("click", function () {
+        flowDirectionActive = !flowDirectionActive;
+        flowDirectionToggle.classList.toggle("active", flowDirectionActive);
+        flowDirectionToggle.setAttribute("aria-pressed", String(flowDirectionActive));
+        refreshRiverFlowGraphics();
+      });
+
+      // --- Greys out and disables the Open River Network checkbox
+      //     whenever the current view scale is beyond the layer's own
+      //     minScale (see riverNetworkLayer above) - i.e. zoomed out too
+      //     far for it to draw anyway - rather than leaving it clickable
+      //     with only a tooltip explaining why nothing happens. Reads
+      //     minScale off the layer itself instead of repeating the 1000000
+      //     figure, so the two can never drift apart. Doesn't touch the
+      //     checkbox's checked state - if it was already on when you zoom
+      //     out past range, it stays on (and the layer stays out of view
+      //     via minScale on its own) so zooming back in resumes showing it
+      //     without having to re-toggle it. ---
+      function updateRiverNetworkAvailability() {
+        const available = view.scale <= riverNetworkLayer.minScale;
+        riverNetworkLayerToggle.disabled = !available;
+        riverNetworkLayerRow.classList.toggle("scaleDisabled", !available);
+        // "Show flow direction" needs both this scale condition AND the
+        // network layer's own checkbox switched on - see that toggle's
+        // change handler above for the other half of this.
+        const flowAvailable = available && riverNetworkLayerToggle.checked;
+        flowDirectionToggle.disabled = !flowAvailable;
+        refreshRiverFlowGraphics();
+      }
+
+      // Counts up each time refreshRiverFlowGraphics is called, so a
+      // still-in-flight query from an earlier call (e.g. the user panned
+      // twice in quick succession) can tell it's been superseded and drop
+      // its results instead of overwriting a newer, more relevant set.
+      let riverFlowRequestToken = 0;
+
+      // Re-populates riverFlowLayer with whichever river segments are
+      // visible right now, so the animated overlay only ever has to hold a
+      // screenful of the network rather than all 182,731 segments at once.
+      // A no-op (and clears/hides the layer) unless "Show flow direction"
+      // is actually on and available - see flowDirectionActive/
+      // flowDirectionToggle.disabled, kept as the one place that decides
+      // that. Called whenever what should be showing might have changed:
+      // the button and the Open River Network checkbox above,
+      // every scale-availability recheck, a theme change (setTheme - new
+      // graphics need the new theme's color), and once the view settles
+      // after a pan/zoom (see the view.watch("stationary", ...) below).
+      // Wrapped defensively since riverFlowLayer may not have made it into
+      // map.layers at all (see the try/catch around map.layers.add
+      // earlier) - this silently does nothing in that case rather than
+      // throwing on every toggle/pan.
+      function refreshRiverFlowGraphics() {
+        if (!map.layers.includes(riverFlowLayer)) return;
+
+        const active = !flowDirectionToggle.disabled && flowDirectionActive;
+        if (!active) {
+          riverFlowLayer.visible = false;
+          riverFlowLayer.graphics.removeAll();
+          return;
+        }
+
+        riverFlowLayer.visible = true;
+
+        const requestToken = ++riverFlowRequestToken;
+        // A fixed highlight colour rather than the river line's own blue -
+        // see the comment above RIVER_FLOW_HIGHLIGHT_COLOR for why the
+        // trail needs to look different from the line, not just wider.
+        const color = RIVER_FLOW_HIGHLIGHT_COLOR.concat(255);
+        const collected = [];
+
+        function fetchPage(startAt) {
+          const query = riverNetworkLayer.createQuery();
+          query.geometry = view.extent;
+          query.spatialRelationship = "intersects";
+          query.outSpatialReference = view.spatialReference;
+          query.returnGeometry = true;
+          query.outFields = ["OBJECTID", "Strahler"];
+          query.num = 2000;
+          query.start = startAt;
+
+          riverNetworkLayer.queryFeatures(query).then(function (result) {
+            // A newer refreshRiverFlowGraphics call has already started -
+            // let its own chain finish instead of racing it.
+            if (requestToken !== riverFlowRequestToken) return;
+
+            for (let i = 0; i < result.features.length && collected.length < RIVER_FLOW_MAX_SEGMENTS; i++) {
+              const feature = result.features[i];
+              const geometry = feature.geometry;
+              collected.push({
+                attributes: {
+                  color: color,
+                  halfWidth: riverFlowHalfWidthForStrahler(feature.attributes.Strahler)
+                },
+                geometry: {
+                  type: "polyline",
+                  paths: geometry.paths,
+                  spatialReference: geometry.spatialReference
+                }
+              });
+            }
+
+            const keepPaging = result.exceededTransferLimit && collected.length < RIVER_FLOW_MAX_SEGMENTS;
+            if (keepPaging) {
+              fetchPage(startAt + result.features.length);
+            } else {
+              riverFlowLayer.graphics.removeAll();
+              riverFlowLayer.graphics.addMany(collected);
+            }
+          });
+        }
+
+        fetchPage(0);
+      }
+
+      // Re-queries once panning/zooming actually stops, rather than on
+      // every intermediate frame while the view is still moving - matches
+      // the scale watcher's own view.watch(...) style just below.
+      view.watch("stationary", function (stationary) {
+        if (stationary) refreshRiverFlowGraphics();
+      });
+      // Keeps an open storm popup pinned to its outfall's map position as
+      // the view pans/zooms - snaps to the correct spot once movement
+      // stops rather than following continuously mid-drag, same
+      // "stationary" pattern as refreshRiverFlowGraphics just above.
+      // positionStormPopup closes it itself if the point has panned
+      // outside the view entirely.
+      view.watch("stationary", function (stationary) {
+        if (stationary) positionStormPopup();
+      });
+      view.watch("scale", updateRiverNetworkAvailability);
+      updateRiverNetworkAvailability();
+
+      // Storm Overflows toggle - independent of the organisation selection
+      // and of every other contextual layer, same wiring style as
+      // catchmentsLayerToggle above. All of stormOverflowLayers switch
+      // together since the sidebar only shows the one merged checkbox -
+      // see the comment above their construction.
+      const stormOverflowToggle = document.getElementById("stormOverflowToggle");
+      const stormOverflowFilterBtn = document.getElementById("stormOverflowFilterBtn");
+      stormOverflowToggle.addEventListener("change", function () {
+        stormOverflowLayers.forEach(function (l) { l.visible = stormOverflowToggle.checked; });
+        // Only meaningful with the layer itself on, same disabled-when-
+        // parent's-off pattern as flowDirectionToggle/riverNetworkLayerToggle.
+        // Its own on/off state (and definitionExpression, if already
+        // active) is left alone - switching Storm Overflows back on later
+        // resumes whatever filter state this was already in.
+        stormOverflowFilterBtn.disabled = !stormOverflowToggle.checked;
+        // A popup open on an outfall that just got hidden would otherwise
+        // be left floating over a layer that no longer exists on screen.
+        if (!stormOverflowToggle.checked) closeStormPopup();
+        updateLegendLayers();
+      });
+
+      // --- "Show only discharging / recent" button under Storm Overflows -
+      //     a plain on/off toggle (not tied to the checkbox above beyond
+      //     needing it switched on) that sets definitionExpression on every
+      //     storm overflow layer to hide everything except the two states
+      //     buildStormOverflowPriorityArcade already draws on top:
+      //     currently discharging and discharged within the last 48 hours.
+      //
+      //     definitionExpression needs a SQL WHERE clause, not the Arcade
+      //     buildStormOverflowCategoryLogic uses -
+      //     buildStormOverflowFilterExpression mirrors just its
+      //     "spilling"/"recent" branches in SQL instead, using each
+      //     layer's own field names (see layer._stormOverflowFields, set
+      //     when stormOverflowLayers was built) since a couple of the ten
+      //     sources don't share the usual Status/LatestEventEnd names. The
+      //     48-hour cutoff has to be a literal timestamp rather than
+      //     something the server evaluates live, so it's recomputed and
+      //     reapplied on a 5-minute timer (matching each layer's own
+      //     refreshInterval) for as long as the filter stays on, rather
+      //     than computed once and left to quietly drift stale over a
+      //     long session. ---
+      let stormOverflowFilterActive = false;
+      let stormOverflowFilterIntervalId = null;
+
+      function buildStormOverflowFilterExpression(fields) {
+        const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+        const pad = function (n) { return String(n).padStart(2, "0"); };
+        const cutoffSql = cutoff.getUTCFullYear() + "-" + pad(cutoff.getUTCMonth() + 1) + "-" + pad(cutoff.getUTCDate()) +
+          " " + pad(cutoff.getUTCHours()) + ":" + pad(cutoff.getUTCMinutes()) + ":" + pad(cutoff.getUTCSeconds());
+        return fields.status + " = 1 OR (" + fields.status + " = 0 AND " + fields.latestEventEnd + " >= TIMESTAMP '" + cutoffSql + "')";
+      }
+
+      function applyStormOverflowFilter() {
+        stormOverflowLayers.forEach(function (l) {
+          l.definitionExpression = stormOverflowFilterActive ? buildStormOverflowFilterExpression(l._stormOverflowFields) : null;
+        });
+      }
+
+      stormOverflowFilterBtn.addEventListener("click", function () {
+        stormOverflowFilterActive = !stormOverflowFilterActive;
+        stormOverflowFilterBtn.classList.toggle("active", stormOverflowFilterActive);
+        stormOverflowFilterBtn.setAttribute("aria-pressed", String(stormOverflowFilterActive));
+        applyStormOverflowFilter();
+
+        if (stormOverflowFilterIntervalId) {
+          clearInterval(stormOverflowFilterIntervalId);
+          stormOverflowFilterIntervalId = null;
+        }
+        if (stormOverflowFilterActive) {
+          stormOverflowFilterIntervalId = setInterval(applyStormOverflowFilter, 5 * 60 * 1000);
+        }
+      });
+
+      // --- Contextual layers panel tabs: "Layers" (the toggle checkboxes)
+      //     and "Legend" (a legend for whichever of those layers are
+      //     currently switched on). A separate little tab bar from the
+      //     top-level Map/Site league table one - see the .contextualTabBar
+      //     CSS comment for why it doesn't share that markup's classes. ---
+      const contextualTabButtons = document.querySelectorAll(".contextualTabButton");
+      const contextualLayersListTab = document.getElementById("contextualLayersListTab");
+      const contextualLayersLegendTab = document.getElementById("contextualLayersLegendTab");
+      const contextualLegendContainer = document.getElementById("contextualLegend");
+      const contextualLegendEmpty = document.getElementById("contextualLegendEmpty");
+
+      contextualTabButtons.forEach(function (btn) {
+        btn.addEventListener("click", function () { switchContextualTab(btn.dataset.contextualTab); });
+      });
+
+      function switchContextualTab(tab) {
+        contextualTabButtons.forEach(function (btn) {
+          btn.classList.toggle("active", btn.dataset.contextualTab === tab);
+        });
+        contextualLayersListTab.hidden = tab !== "layers";
+        contextualLayersLegendTab.hidden = tab !== "legend";
+      }
 
       // --- Light/dark toggle. setTheme() (defined below, once
       //     updateSymbology/renderMetricList/renderSurveyCard/renderChart
@@ -1659,6 +3833,56 @@
         return true;
       }
 
+      // --- Date range presets: each is a rolling window ending today
+      //     (not a calendar-aligned month/year) - "Last month" means the
+      //     past ~30 days from right now, not "the whole of last month". ---
+      const DATE_PRESETS = {
+        month: function (d) { d.setMonth(d.getMonth() - 1); },
+        quarter: function (d) { d.setMonth(d.getMonth() - 3); },
+        year: function (d) { d.setFullYear(d.getFullYear() - 1); }
+      };
+
+      // Formats a Date as the "YYYY-MM-DD" string <input type="date">
+      // expects - from its own local getFullYear/Month/Date, not toISOString
+      // (which would shift by the browser's UTC offset and can land on the
+      // wrong day).
+      function formatDateInput(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return y + "-" + m + "-" + d;
+      }
+
+      // The {from, to} strings a given preset resolves to right now - used
+      // both to actually set the inputs (applyDatePreset) and to check
+      // whether the inputs already match one (updateDatePresetHighlight),
+      // so the two can never drift apart into disagreeing with each other.
+      function presetRangeStrings(preset) {
+        const from = new Date();
+        DATE_PRESETS[preset](from);
+        return { from: formatDateInput(from), to: TODAY_STR };
+      }
+
+      function applyDatePreset(preset) {
+        const range = presetRangeStrings(preset);
+        dateFromInput.value = range.from;
+        dateToInput.value = range.to;
+        updateDateRange();
+      }
+
+      // Highlights whichever preset button (if any) exactly matches the
+      // two date inputs' current values - cleared automatically the
+      // moment either input is hand-edited to something a preset
+      // wouldn't produce, since this just re-checks from scratch every
+      // time (see updateDateRange).
+      function updateDatePresetHighlight() {
+        datePresetButtons.forEach(function (btn) {
+          const range = presetRangeStrings(btn.dataset.preset);
+          const matches = dateFromInput.value === range.from && dateToInput.value === range.to;
+          btn.classList.toggle("active", matches);
+        });
+      }
+
       // Recomputes the primary site's carousel data and re-draws the chart
       // for whichever site(s) are selected - called whenever the date
       // range changes. A no-op with nothing selected.
@@ -1673,6 +3897,7 @@
           updateAvailableMetrics(); // re-renders the metric list + map symbology
           renderLeagueTable();
           applyLocationFilter(); // which sites have a survey in range can change too
+          applyAllSitesFilter(); // ...and so can which sites are "yet to be surveyed"
         }
 
         if (selectedSites.length === 0) return;
@@ -1701,8 +3926,14 @@
         dateRangeFrom = parseDateInputStart(dateFromInput.value);
         dateRangeTo = parseDateInputEnd(dateToInput.value);
         updateDateRangeClearVisibility();
+        updateDatePresetHighlight();
         refreshForDateRange();
       }
+
+      const datePresetButtons = document.querySelectorAll(".datePresetBtn");
+      datePresetButtons.forEach(function (btn) {
+        btn.addEventListener("click", function () { applyDatePreset(btn.dataset.preset); });
+      });
 
       dateFromInput.addEventListener("change", updateDateRange);
       dateToInput.addEventListener("change", updateDateRange);
@@ -1746,10 +3977,16 @@
         const visible = currentTab === "map" && !!orgFilter.value;
         metricListLabel.style.display = visible ? "block" : "none";
         metricListEl.style.display = visible ? "flex" : "none";
+        // These three live in #topBar now, not the sidebar - hidden via
+        // visibility rather than display so their space stays reserved and
+        // #topBar's height never shifts as a tab switches or the
+        // organisation selection changes (display:none would let the row
+        // shrink to fit whatever's left, which is the bug this avoids).
+        dateRangeLabel.style.visibility = visible ? "visible" : "hidden";
+        dateRangeRow.style.visibility = visible ? "visible" : "hidden";
+        dateRangePresets.style.visibility = visible ? "visible" : "hidden";
+        showAllSitesRow.style.visibility = visible ? "visible" : "hidden";
         symbolLegend.style.display = visible ? "block" : "none";
-        dateRangeLabel.style.display = visible ? "block" : "none";
-        dateRangeRow.style.display = visible ? "flex" : "none";
-        showAllSitesRow.style.display = visible ? "flex" : "none";
         updateDateRangeClearVisibility();
       }
 
@@ -1847,20 +4084,55 @@
 
         if (!metric) {
           locationsLayer.renderer = buildLocationsRenderer(null, null, null, null, MARKER_COLOR);
-          legend.layerInfos = [];
-          return;
+        } else {
+          const values = leagueRows
+            .map(function (r) { return r[metric.locationField]; })
+            .filter(function (v) { return v !== null && v !== undefined; });
+
+          const minVal = values.length ? Math.min.apply(null, values) : null;
+          const maxVal = values.length ? Math.max.apply(null, values) : null;
+
+          locationsLayer.renderer = buildLocationsRenderer(metric.locationField, leagueRows, minVal, maxVal, metricColor(metric));
+          locationsLayer.title = metric.label;
         }
 
-        const values = leagueRows
-          .map(function (r) { return r[metric.locationField]; })
-          .filter(function (v) { return v !== null && v !== undefined; });
+        updateLegendLayers();
+      }
 
-        const minVal = values.length ? Math.min.apply(null, values) : null;
-        const maxVal = values.length ? Math.max.apply(null, values) : null;
+      // --- Rebuilds both Legend widgets' layer lists from scratch:
+      //     `legend` (in the filters section) gets just the selected
+      //     metric's size ramp, and `contextualLegend` (in the contextual
+      //     layers panel's own Legend tab) gets one entry per contextual
+      //     layer currently switched on - the WFD catchments layer's
+      //     service-provided color-by-ecological-class legend today, more
+      //     to follow as more contextual layers are added. Kept as two
+      //     independent widgets/lists (rather than one shared one) so the
+      //     water quality legend and the contextual layers legend never mix.
+      //     Called from updateSymbology (a metric or org/date-range change)
+      //     and from the catchments checkbox's own change handler, so
+      //     either one changing keeps both lists correct without the two
+      //     having to coordinate. ---
+      function updateLegendLayers() {
+        const metric = METRIC_CATALOG.find(function (m) { return m.key === selectedMetricKey; });
+        legend.layerInfos = metric ? [{ layer: locationsLayer, title: metric.label }] : [];
 
-        locationsLayer.renderer = buildLocationsRenderer(metric.locationField, leagueRows, minVal, maxVal, metricColor(metric));
-        locationsLayer.title = metric.label;
-        legend.layerInfos = [{ layer: locationsLayer, title: metric.label }];
+        const contextualInfos = [];
+        if (catchmentsLayer.visible) {
+          contextualInfos.push({ layer: catchmentsLayer, title: catchmentsLayer.title });
+        }
+        if (riverNetworkLayer.visible) {
+          contextualInfos.push({ layer: riverNetworkLayer, title: riverNetworkLayer.title });
+        }
+        // Only ever the first of stormOverflowLayers - see the comment
+        // above their construction for why one legend entry is enough for
+        // all of them (they share one renderer and one sidebar toggle).
+        if (stormOverflowLayers[0].visible) {
+          contextualInfos.push({ layer: stormOverflowLayers[0], title: stormOverflowLayers[0].title });
+        }
+        contextualLegend.layerInfos = contextualInfos;
+
+        contextualLegendContainer.style.display = contextualInfos.length ? "block" : "none";
+        contextualLegendEmpty.style.display = contextualInfos.length ? "none" : "block";
       }
 
       // --- Applies `theme` ("dark"/"light") everywhere it needs to be set
@@ -1889,7 +4161,24 @@
 
         applyBasemap();
         organisationLayer.renderer = buildOrganisationRenderer(theme);
+        riverNetworkLayer.renderer = buildRiverNetworkRenderer();
+        // A soft glow around the river lines (but not the animated flow
+        // trail - see riverFlowLayer, a separate WebGL layer with no
+        // effect of its own) - used to switch between white (dark mode)
+        // and this dark shadow (light mode) so the lines stood out from
+        // whichever basemap was underneath them. The light-mode look
+        // (paired with RIVER_NETWORK_LINE_COLOR above) turned out to work
+        // well against the dark basemap too, so it's fixed now rather
+        // than switching with `theme`.
+        riverNetworkLayer.effect = "drop-shadow(0px, 0px, 3px, #000000)";
+        // No refreshRiverFlowGraphics() call needed here - the animated
+        // trail's own colour (RIVER_FLOW_HIGHLIGHT_COLOR) is deliberately
+        // fixed rather than theme-based (see the comment above it), so a
+        // theme change has nothing about the trail to update.
         allSitesLayer.renderer = buildAllSitesRenderer(theme);
+        // No renderer rebuild needed here - every storm overflow icon is
+        // now a fixed-colour emoji rather than a themed fill/outline, same
+        // reasoning as the flow trail's highlight colour above.
 
         const isLight = theme === "light";
         themeToggleBtn.setAttribute("aria-pressed", String(isLight));
@@ -1925,6 +4214,7 @@
       //     torn down when hidden - just its container - so switching back
       //     to it is instant. ---
       const tabButtons = document.querySelectorAll(".tabButton");
+      const sidebarEl = document.getElementById("sidebar");
       const mapArea = document.getElementById("mapArea");
       const leagueArea = document.getElementById("leagueArea");
 
@@ -1937,9 +4227,12 @@
         tabButtons.forEach(function (btn) {
           btn.classList.toggle("active", btn.dataset.tab === tab);
         });
+        // The sidebar (metric picker + contextual layers) only means
+        // anything on the map - hidden on the league tab so the table gets
+        // the full width, same idea as mapArea below.
+        sidebarEl.style.display = tab === "league" ? "none" : "flex";
         mapArea.style.display = tab === "map" ? "flex" : "none";
         leagueArea.style.display = tab === "league" ? "block" : "none";
-        locationCount.style.display = tab === "map" ? "block" : "none";
         updateMetricPanelVisibility();
 
         if (tab === "league") {
@@ -2014,7 +4307,6 @@
           // at all", which would show every site from every organisation
           // if the reference layer's toggle happens to be on.
           allSitesLayer.definitionExpression = "1 = 0";
-          locationCount.innerText = "Select an organisation to see its locations";
 
           view.goTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM });
           return;
@@ -2046,19 +4338,12 @@
           });
         }
 
-        // The reference layer shows every one of the org's sites - no
-        // survey-count or league-table-checkbox narrowing, unlike
-        // locationsLayer below (see applyLocationFilter).
-        allSitesLayer.definitionExpression = `organisationName = '${escapeSql(orgName)}'`;
-
         locationsLayer.visible = true;
         applyLocationFilter();
-      }
-
-      function updateLocationCount() {
-        locationsLayer.queryFeatureCount(locationsLayer.createQuery()).then(function (count) {
-          locationCount.innerText = count.toLocaleString() + " locations shown";
-        });
+        // Narrowed to zero-survey sites once leagueRows is actually
+        // populated - see applyAllSitesFilter. Not narrowed further by any
+        // league-table selection the way locationsLayer is above.
+        applyAllSitesFilter();
       }
 
       // Escapes a value for safe embedding in a definitionExpression string
@@ -2080,9 +4365,9 @@
         let where = `organisationName = '${escapeSql(orgName)}'`;
 
         // Only show sites with at least one survey in the current date
-        // range - see recomputeLeagueRows. A site with none still exists
-        // on the "All site locations" reference layer (allSitesLayer) if
-        // the user turns that on.
+        // range - see recomputeLeagueRows. A site with none instead shows
+        // on the "Sites yet to be surveyed" reference layer (allSitesLayer)
+        // if the user turns that on - see applyAllSitesFilter.
         const surveyedIDs = leagueRows.filter(function (r) { return r.totalSurveys > 0; }).map(function (r) { return r.locationID; });
         if (surveyedIDs.length === 0) {
           // Nothing has a survey yet in range (or the org's data is still
@@ -2100,15 +4385,270 @@
           where += ` AND locationID IN (${ids})`;
         }
         locationsLayer.definitionExpression = where;
-        updateLocationCount();
       }
 
-      // --- Click a location point to see its details, or click an
-      //     organisation polygon to select/zoom into that organisation.
-      //     Ctrl/Cmd-click a point instead of a plain click to compare it
-      //     against whatever's already selected - see handleLocationClick. ---
+      // Recomputes allSitesLayer's definitionExpression - the "Sites yet to
+      // be surveyed" reference layer - from the current organisation
+      // filter plus whichever of its sites have had ZERO surveys in the
+      // current date range (see recomputeLeagueRows). The exact complement
+      // of applyLocationFilter's surveyedIDs above, so the two layers never
+      // show the same site twice. Deliberately NOT narrowed by
+      // leagueSelectedIDs the way locationsLayer is - this is a general
+      // "what hasn't been surveyed yet" reference, not part of the
+      // site-comparison selection.
+      function applyAllSitesFilter() {
+        const orgName = orgFilter.value;
+        if (!orgName) return;
+        let where = `organisationName = '${escapeSql(orgName)}'`;
+
+        const unsurveyedIDs = leagueRows.filter(function (r) { return r.totalSurveys === 0; }).map(function (r) { return r.locationID; });
+        if (unsurveyedIDs.length === 0) {
+          // Every site has at least one survey in range (or the org's data
+          // is still loading - see loadLeagueTable/recomputeLeagueRows) -
+          // nothing left to flag as "yet to be surveyed".
+          where += ` AND 1 = 0`;
+        } else {
+          const unsurveyedList = unsurveyedIDs.map(function (id) { return `'${escapeSql(id)}'`; }).join(", ");
+          where += ` AND locationID IN (${unsurveyedList})`;
+        }
+        allSitesLayer.definitionExpression = where;
+      }
+
+      // --- Custom storm overflow popup - see the big comment above
+      //     .stormPopup in the stylesheet for why this is hand-built
+      //     rather than Esri's own Popup widget. Opened/closed/positioned
+      //     from the view's click handler and stationary watcher just
+      //     below. Only ever shows the single outfall that was actually
+      //     clicked - no "1 of 8" style navigation between overlapping
+      //     outfalls the way Esri's own Popup offered, which keeps this
+      //     considerably simpler; the reference design didn't show that
+      //     either. ---
+      const stormPopupEl = document.getElementById("stormPopup");
+      const stormPopupContentEl = document.getElementById("stormPopupContent");
+      const stormPopupCloseBtn = document.getElementById("stormPopupCloseBtn");
+
+      // The currently-open outfall's graphic/fields, kept around so
+      // positionStormPopup can re-derive its screen position after every
+      // pan/zoom and renderStormPopupContent can re-render it every second
+      // while ticking a live discharge duration. Both null when closed.
+      let stormPopupGraphic = null;
+      let stormPopupFields = null;
+      let stormPopupTickIntervalId = null;
+
+      function closeStormPopup() {
+        if (stormPopupTickIntervalId) {
+          clearInterval(stormPopupTickIntervalId);
+          stormPopupTickIntervalId = null;
+        }
+        stormPopupGraphic = null;
+        stormPopupFields = null;
+        stormPopupEl.hidden = true;
+      }
+
+      stormPopupCloseBtn.addEventListener("click", closeStormPopup);
+
+      // Escape closes it the same way it would close a native browser
+      // dialog - a small extra courtesy Esri's own Popup gave for free.
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !stormPopupEl.hidden) closeStormPopup();
+      });
+
+      function openStormPopup(graphic, fields) {
+        stormPopupGraphic = graphic;
+        stormPopupFields = fields;
+        stormPopupEl.hidden = false;
+        renderStormPopupContent();
+        positionStormPopup();
+
+        if (stormPopupTickIntervalId) {
+          clearInterval(stormPopupTickIntervalId);
+          stormPopupTickIntervalId = null;
+        }
+        // Only an ONGOING discharge needs a live-ticking duration - a
+        // completed or non-discharging outfall's card never changes while
+        // the popup sits open, so there's nothing worth a timer for.
+        const category = stormOverflowCategoryFromAttributes(graphic.attributes, fields);
+        if (category === "spilling") {
+          stormPopupTickIntervalId = setInterval(renderStormPopupContent, 1000);
+        }
+      }
+
+      // Rebuilds the popup's header + card from stormPopupGraphic/Fields.
+      // Deliberately touches only #stormPopupContent, never #stormPopup
+      // itself - see the comment above .stormPopup in the stylesheet for
+      // why the close button and arrow need to sit outside this, given
+      // this function re-runs every second for an ongoing discharge.
+      function renderStormPopupContent() {
+        if (!stormPopupGraphic) return;
+        const attrs = stormPopupGraphic.attributes;
+        const fields = stormPopupFields;
+        const category = stormOverflowCategoryFromAttributes(attrs, fields);
+        const startMs = attrs[fields.latestEventStart];
+        const endMs = attrs[fields.latestEventEnd];
+        const lastUpdatedMs = attrs[fields.lastUpdated];
+
+        const company = attrs[fields.company] || "";
+        const id = attrs[fields.id];
+        const watercourse = attrs[fields.receivingWaterCourse];
+
+        let cardInner;
+        if (category === "spilling") {
+          // Ongoing: a single "Started" line (with its own date, since
+          // there's no Ended column alongside it to carry that context),
+          // an ACTIVE pill, and a duration ticking up against right now.
+          const badge = stormOverflowFormatDateBadge(startMs);
+          cardInner =
+            (badge ? "<div class=\"stormPopupDateBadge\">" +
+              "<span class=\"stormPopupDateBadgeMonth\">" + badge.month + "</span>" +
+              "<span class=\"stormPopupDateBadgeDay\">" + badge.day + "</span>" +
+              "<span class=\"stormPopupDateBadgeYear\">" + badge.year + "</span>" +
+              "</div>" : "") +
+            "<div class=\"stormPopupDetails\">" +
+              "<div class=\"stormPopupHeadlineRow\">" +
+                "<span class=\"stormPopupHeadline\">" + STORM_OVERFLOW_STATUS_HEADLINES.spilling +
+                  " <span class=\"stormPopupHeadlineGlyph\">" + STORM_OVERFLOW_GLYPHS.spilling + "</span></span>" +
+                "<span class=\"stormPopupActivePill\">Active</span>" +
+              "</div>" +
+              "<div class=\"stormPopupTimeCol\">" +
+                "<span class=\"stormPopupTimeLabel\">Started</span>" +
+                "<span class=\"stormPopupTimeValue\">" + (stormOverflowFormatFullDateTime(startMs) || "–") + "</span>" +
+              "</div>" +
+              "<div class=\"stormPopupDuration\">Duration: " + (startMs ? stormOverflowFormatLiveDuration(startMs) : "–") + "</div>" +
+            "</div>";
+        } else if (category === "recent") {
+          // Completed event within the last 48 hours - fixed Started/
+          // Ended columns and a static duration, same layout as before.
+          const badge = stormOverflowFormatDateBadge(startMs || lastUpdatedMs);
+          const startTime = stormOverflowFormatTime(startMs);
+          const endTime = stormOverflowFormatTime(endMs);
+          const duration = stormOverflowFormatCompletedDuration(startMs, endMs);
+          cardInner =
+            (badge ? "<div class=\"stormPopupDateBadge\">" +
+              "<span class=\"stormPopupDateBadgeMonth\">" + badge.month + "</span>" +
+              "<span class=\"stormPopupDateBadgeDay\">" + badge.day + "</span>" +
+              "<span class=\"stormPopupDateBadgeYear\">" + badge.year + "</span>" +
+              "</div>" : "") +
+            "<div class=\"stormPopupDetails\">" +
+              "<div class=\"stormPopupHeadlineRow\">" +
+                "<span class=\"stormPopupHeadline\">" + STORM_OVERFLOW_STATUS_HEADLINES.recent +
+                  " <span class=\"stormPopupHeadlineGlyph\">" + STORM_OVERFLOW_GLYPHS.recent + "</span></span>" +
+              "</div>" +
+              "<div class=\"stormPopupTimes\">" +
+                "<div class=\"stormPopupTimeCol\"><span class=\"stormPopupTimeLabel\">Started</span><span class=\"stormPopupTimeValue\">" + (startTime || "–") + "</span></div>" +
+                "<div class=\"stormPopupTimeCol\"><span class=\"stormPopupTimeLabel\">Ended</span><span class=\"stormPopupTimeValue\">" + (endTime || "–") + "</span></div>" +
+              "</div>" +
+              (duration ? "<div class=\"stormPopupDuration\">Duration: " + duration + "</div>" : "") +
+            "</div>";
+        } else {
+          // notspilling / offline - no event worth showing times for.
+          const badge = stormOverflowFormatDateBadge(lastUpdatedMs);
+          cardInner =
+            (badge ? "<div class=\"stormPopupDateBadge\">" +
+              "<span class=\"stormPopupDateBadgeMonth\">" + badge.month + "</span>" +
+              "<span class=\"stormPopupDateBadgeDay\">" + badge.day + "</span>" +
+              "<span class=\"stormPopupDateBadgeYear\">" + badge.year + "</span>" +
+              "</div>" : "") +
+            "<div class=\"stormPopupDetails\">" +
+              "<div class=\"stormPopupHeadlineRow\">" +
+                "<span class=\"stormPopupHeadline\">" + STORM_OVERFLOW_STATUS_HEADLINES[category] +
+                  " <span class=\"stormPopupHeadlineGlyph\">" + STORM_OVERFLOW_GLYPHS[category] + "</span></span>" +
+              "</div>" +
+              "<div class=\"stormPopupNoActivity\">No discharge currently recorded for this outfall.</div>" +
+            "</div>";
+        }
+
+        stormPopupContentEl.innerHTML =
+          "<div class=\"stormPopupHeader\">" +
+            "<span class=\"stormPopupGlyph\">" + STORM_OVERFLOW_GLYPHS[category] + "</span>" +
+            "<div class=\"stormPopupTitleBlock\">" +
+              "<div class=\"stormPopupCompany\">" + company + "</div>" +
+              (id ? "<div class=\"stormPopupId\">" + id + "</div>" : "") +
+            "</div>" +
+          "</div>" +
+          (watercourse ? "<div class=\"stormPopupFeeds\">Feeds into: <strong>" + watercourse + "</strong></div>" : "") +
+          "<hr class=\"stormPopupDivider\" />" +
+          "<div class=\"stormPopupCard stormPopupCard--" + category + "\">" + cardInner + "</div>" +
+          (lastUpdatedMs ? "<div class=\"stormPopupUpdated\">Data last updated " + new Date(lastUpdatedMs).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) + "</div>" : "");
+      }
+
+      // Anchors the popup to stormPopupGraphic's map position, converted
+      // to on-screen coordinates via view.toScreen() - see the comment
+      // above #mapColumn's `position: relative` for why those coordinates
+      // can be used as left/top directly. Prefers placing the card ABOVE
+      // the point (arrow pointing down at it, matching the reference
+      // design); flips below if there isn't room above. Closes the popup
+      // outright if the point has panned/zoomed off screen entirely,
+      // rather than leaving it floating over nothing.
+      function positionStormPopup() {
+        if (!stormPopupGraphic) return;
+        const screenPoint = view.toScreen(stormPopupGraphic.geometry);
+        if (!screenPoint) { closeStormPopup(); return; }
+
+        const margin = 8;
+        const viewWidth = view.width;
+        const viewHeight = view.height;
+        if (screenPoint.x < -margin || screenPoint.x > viewWidth + margin ||
+            screenPoint.y < -margin || screenPoint.y > viewHeight + margin) {
+          closeStormPopup();
+          return;
+        }
+
+        const popupWidth = stormPopupEl.offsetWidth;
+        const popupHeight = stormPopupEl.offsetHeight;
+        const pointClearance = 14;
+
+        let left = screenPoint.x - popupWidth / 2;
+        left = Math.max(margin, Math.min(left, viewWidth - popupWidth - margin));
+
+        const spaceAbove = screenPoint.y;
+        const placeAbove = spaceAbove >= popupHeight + pointClearance + margin;
+        let top;
+        if (placeAbove) {
+          top = screenPoint.y - popupHeight - pointClearance;
+          stormPopupEl.classList.remove("stormPopup--below");
+          stormPopupEl.classList.add("stormPopup--above");
+        } else {
+          top = screenPoint.y + pointClearance;
+          stormPopupEl.classList.remove("stormPopup--above");
+          stormPopupEl.classList.add("stormPopup--below");
+        }
+
+        stormPopupEl.style.left = left + "px";
+        stormPopupEl.style.top = top + "px";
+
+        // The arrow points at the actual click position even when the
+        // card itself has been shifted sideways to stay on screen.
+        const arrowEl = stormPopupEl.querySelector(".stormPopupArrow");
+        if (arrowEl) {
+          const arrowLeft = Math.max(16, Math.min(screenPoint.x - left, popupWidth - 16));
+          arrowEl.style.left = arrowLeft + "px";
+          arrowEl.style.marginLeft = "-6px";
+        }
+      }
+
+      // --- Click a location point to see its details, click an
+      //     organisation polygon to select/zoom into that organisation, or
+      //     click a storm overflow outfall to open its custom popup (see
+      //     openStormPopup/closeStormPopup) - checked first since only one
+      //     of these popups/selections makes sense open at a time, and a
+      //     miss here (nothing storm-related under the click) always
+      //     closes whatever storm popup was open, same "click elsewhere
+      //     dismisses it" behaviour Esri's own Popup would have given for
+      //     free. Ctrl/Cmd-click a location point instead of a plain click
+      //     to compare it against whatever's already selected - see
+      //     handleLocationClick. ---
       view.on("click", function (event) {
         view.hitTest(event).then(function (response) {
+          const stormResult = response.results.find(function (r) {
+            return r.graphic && r.graphic.layer && stormOverflowLayers.indexOf(r.graphic.layer) !== -1;
+          });
+
+          if (stormResult) {
+            openStormPopup(stormResult.graphic, stormResult.graphic.layer._stormOverflowFields);
+          } else {
+            closeStormPopup();
+          }
+
           const locationResult = response.results.find(function (r) {
             return r.graphic && r.graphic.layer === locationsLayer;
           });
@@ -2118,6 +4658,17 @@
             handleLocationClick(locationResult.graphic, addToCompare);
             return;
           }
+
+          // Once an organisation is selected, its polygon is the only one
+          // left shown/hit-testable (organisationLayer.definitionExpression
+          // narrows it down in selectOrganisation below), so a click here
+          // can only ever be a re-click on the org that's already selected -
+          // most often a mis-click while aiming for a survey point sitting
+          // inside/near its boundary. Ignore it rather than re-running the
+          // zoom-and-select every time; changing organisation again means
+          // going via the dropdown, back to "All organisations" first (or
+          // straight to a different one).
+          if (orgFilter.value) return;
 
           const orgResult = response.results.find(function (r) {
             return r.graphic && r.graphic.layer === organisationLayer;
@@ -2220,7 +4771,22 @@
           const box = el.closest(".statBox");
           const collected = availableMetrics.some(function (am) { return am.key === m.key; });
           if (box) box.style.display = collected ? "" : "none";
-          if (collected) el.innerText = formatNumber(row ? row[m.locationField] : null);
+          const value = row ? row[m.locationField] : null;
+          if (collected) el.innerText = formatNumber(value);
+
+          // The phosphate stat box additionally tints itself to match
+          // whichever WFD band (see PHOSPHATE_WFD_BANDS at the top of the
+          // file) this site's average phosphate reading falls into - the
+          // same colors as the map's phosphate rings, so the number and
+          // the map reinforce each other rather than needing a separate
+          // key. Cleared back to the plain statBox look when there's
+          // nothing to classify (site not collecting phosphate, or no
+          // reading in the current date range).
+          if (m.key === "phosphate" && box) {
+            const band = collected ? phosphateWfdBandForValue(value) : null;
+            box.style.background = band ? hexToRgba(band.color, 0.22) : "";
+            el.style.color = band ? band.color : "";
+          }
         });
       }
 
@@ -2351,6 +4917,7 @@
             recomputeLeagueRows();
             updateAvailableMetrics();
             applyLocationFilter(); // now we know which sites actually have a survey in range
+            applyAllSitesFilter(); // ...and which ones don't, for the "yet to be surveyed" layer
 
             emptyEl.hidden = true;
             wrapEl.style.display = "block";
@@ -3358,55 +5925,134 @@
 </head>
 
 <body>
-  <div id="appContainer">
+  <div id="topBar">
+    <div class="topBarGroup topBarTitle">
+      <h2>River Survey Dashboard</h2>
+    </div>
 
-    <div id="sidebar">
-      <div id="sidebarHeader">
-        <h2>River Survey Dashboard</h2>
-        <button type="button" id="themeToggle" class="themeToggleBtn" aria-pressed="false" title="Switch to light mode">
-          <span id="themeToggleIcon" aria-hidden="true">&#9728;</span>
-          <span id="themeToggleLabel">Light mode</span>
-        </button>
-      </div>
+    <div class="topBarDivider"></div>
 
-      <div id="onboardingBanner" class="onboardingBanner">
-        <button type="button" id="onboardingDismiss" class="onboardingDismiss" aria-label="Dismiss">&times;</button>
-        <p>Get started: choose an organisation from the dropdown below, or click a shaded area on the map.</p>
-      </div>
-
+    <div class="topBarGroup">
+      <span class="topBarLabel">View</span>
       <div id="tabBar">
         <button type="button" class="tabButton active" data-tab="map" title="View the map and select an organisation or site">Map</button>
         <button type="button" class="tabButton" data-tab="league" title="Compare every site's water quality metrics in a sortable table">Site league table</button>
       </div>
+    </div>
 
-      <label for="orgFilter">Organisation</label>
+    <div class="topBarDivider"></div>
+
+    <div class="topBarGroup">
+      <label for="orgFilter" class="topBarLabel">Organisation</label>
       <select id="orgFilter" class="onboardingHighlight" title="Select an organisation to see its sites on the map">
         <option value="">All organisations</option>
       </select>
+      <label id="showAllSitesRow" class="checkboxRow" title="Show this organisation's sites that have had no surveys at all in the current date range, as small gray reference dots">
+        <input type="checkbox" id="showAllSitesToggle" />
+        Sites yet to be surveyed
+      </label>
+    </div>
 
-      <div id="locationCount">Select an organisation to see its locations</div>
+    <div class="topBarDivider"></div>
 
-      <label id="metricListLabel" title="Choose which water quality metric sizes the map's points and appears in the chart below">Water quality metric</label>
-      <div id="metricList" class="metricList" role="listbox" aria-label="Water quality metric"></div>
-      <div id="symbolLegend"></div>
-
-      <label id="dateRangeLabel" title="Only show surveys within this date range on the chart and Recent surveys carousel">Date range</label>
+    <div class="topBarGroup">
+      <label id="dateRangeLabel" class="topBarLabel" title="Only show surveys within this date range on the chart and Recent surveys carousel">Date range</label>
       <div id="dateRangeRow" class="dateRangeRow">
         <input type="date" id="dateFrom" aria-label="From date" />
         <span class="dateRangeSep">&ndash;</span>
         <input type="date" id="dateTo" aria-label="To date" />
+        <button type="button" id="dateRangeClear" class="dateRangeClearBtn" hidden>Clear range</button>
       </div>
-      <button type="button" id="dateRangeClear" class="dateRangeClearBtn" hidden>Clear range</button>
+      <div id="dateRangePresets" class="dateRangePresets">
+        <button type="button" class="datePresetBtn" data-preset="month" title="Set the date range to the last month">Last month</button>
+        <button type="button" class="datePresetBtn" data-preset="quarter" title="Set the date range to the last 3 months">Last 3 months</button>
+        <button type="button" class="datePresetBtn" data-preset="year" title="Set the date range to the last year">Last year</button>
+      </div>
+    </div>
 
-      <label id="showAllSitesRow" class="checkboxRow" title="Show every site belonging to this organisation, including ones with no surveys in the current date range, as small gray reference dots">
-        <input type="checkbox" id="showAllSitesToggle" />
-        Show all site locations
-      </label>
+    <div class="topBarGroup topBarRight">
+      <span class="topBarLabel topBarLabelSpacer" aria-hidden="true">Theme</span>
+      <button type="button" id="themeToggle" class="themeToggleBtn" aria-pressed="false" title="Switch to light mode">
+        <span id="themeToggleIcon" aria-hidden="true">&#9728;</span>
+        <span id="themeToggleLabel">Light mode</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Still references the organisation dropdown/map click, just worded
+       for its new spot above #appContainer rather than "below" it inside
+       the old sidebar - see dismissOnboarding() for what clears this. -->
+  <div id="onboardingBanner" class="onboardingBanner">
+    <button type="button" id="onboardingDismiss" class="onboardingDismiss" aria-label="Dismiss">&times;</button>
+    <p>Get started: choose an organisation from the dropdown above, or click a shaded area on the map.</p>
+  </div>
+
+  <div id="appContainer">
+
+    <div id="sidebar">
+      <div id="sidebarFilters">
+        <label id="metricListLabel" title="Choose which water quality metric sizes the map's points and appears in the chart below">Water quality metric</label>
+        <div id="metricList" class="metricList" role="listbox" aria-label="Water quality metric"></div>
+        <div id="symbolLegend"></div>
+      </div>
+
+      <div id="contextualLayersPanel">
+        <h3>Contextual Layers</h3>
+
+        <div class="contextualTabBar">
+          <button type="button" class="contextualTabButton active" data-contextual-tab="layers" title="Switch contextual layers on or off">Layers</button>
+          <button type="button" class="contextualTabButton" data-contextual-tab="legend" title="View the legend for whichever contextual layers are switched on">Legend</button>
+        </div>
+
+        <div id="contextualLayersListTab">
+          <label id="catchmentsLayerRow" class="checkboxRow" title="Overlay the Environment Agency's WFD river catchment boundaries, colored by ecological classification (High/Good/Moderate/Poor/Bad). Not tied to the selected organisation - click a catchment on the map for its details.">
+            <input type="checkbox" id="catchmentsLayerToggle" />
+            WFD Waterbody Classification 2025 (Ecological)
+          </label>
+
+          <label id="riverNetworkLayerRow" class="checkboxRow" title="Overlay the Open River Network's river centerlines for Great Britain, symbolized by Strahler stream order (thin headwaters, thick major rivers). Not tied to the selected organisation.">
+            <input type="checkbox" id="riverNetworkLayerToggle" />
+            Open River Network
+          </label>
+
+          <div class="subControlRow">
+            <button type="button" id="flowDirectionToggle" class="subToggleBtn" disabled aria-pressed="false" title="Animate the river segments currently on screen with a flowing trail showing which way the water moves, using the Open River Network's own flow-direction data. Requires the Open River Network layer above to be switched on.">Show flow direction</button>
+          </div>
+
+          <label id="stormOverflowRow" class="checkboxRow" title="Overlay live storm overflow discharge status from UK water companies - 💩 currently discharging, ⚠️ discharged in the last 48 hours, ✅ not discharged, ❓ offline/no data. Click a point for details. Refreshes automatically every 5 minutes. Not tied to the selected organisation.">
+            <input type="checkbox" id="stormOverflowToggle" />
+            Storm Overflows
+          </label>
+
+          <div class="subControlRow">
+            <button type="button" id="stormOverflowFilterBtn" class="subToggleBtn" disabled aria-pressed="false" title="Show only outfalls currently discharging or discharged within the last 48 hours - hides everything else on this layer. Click again to show all of them. Requires Storm Overflows above to be switched on.">Show only discharging / recent</button>
+          </div>
+        </div>
+
+        <div id="contextualLayersLegendTab" hidden>
+          <div id="contextualLegend"></div>
+          <p id="contextualLegendEmpty" class="contextualLegendEmpty">Switch on a contextual layer to see its legend here.</p>
+        </div>
+      </div>
     </div>
 
     <div id="mapArea">
       <div id="mapColumn">
         <div id="viewDiv" class="onboardingHighlight" title="Click a shaded area to select that organisation, or click a point to see site details. Ctrl/Cmd-click a second point to compare two sites."></div>
+
+        <!-- Storm overflow popup - see the big comment above .stormPopup
+             in the stylesheet for why this is hand-built rather than
+             Esri's own Popup widget. A sibling of #viewDiv (not a child of
+             it), positioned against #mapColumn - see positionStormPopup().
+             stormPopupCloseBtn and stormPopupArrow sit outside
+             #stormPopupContent deliberately, so re-rendering the content
+             (which happens every second while ticking a live discharge
+             duration) never touches them. -->
+        <div id="stormPopup" class="stormPopup" hidden>
+          <div class="stormPopupArrow"></div>
+          <button type="button" class="stormPopupCloseBtn" id="stormPopupCloseBtn" aria-label="Close">&times;</button>
+          <div id="stormPopupContent"></div>
+        </div>
 
         <div id="chartPanel" title="Shows how the selected metric has changed over time - readings from the same day are averaged into one point. Ctrl/Cmd-click a second site on the map to compare it here">
           <div id="chartPlaceholder">Click a location on the map to see its water quality trend.</div>
