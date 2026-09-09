@@ -2513,14 +2513,20 @@
       // are each metric's variant for the dark/light surface respectively -
       // metricColor() picks between them by currentTheme, and every place
       // that shows a metric's color reads it through that function rather
-      // than one of these fields directly.
+      // than one of these fields directly. `aggregation` picks how
+      // recomputeLeagueRows rolls up a site's readings into `locationField`
+      // - "mean" or "median" - per River Trust guidance: ammonia, nitrate
+      // and nitrite are skewed by occasional spikes, so their site-level
+      // figure is a median, while phosphate/turbidity/conductivity stay a
+      // plain average. `unit` is just for display (league table column
+      // headers, stat box labels) and never enters the maths.
       const METRIC_CATALOG = [
-        { key: "phosphate", label: "Phosphate", locationField: "phosphateAverage", observationField: "phosphate", colorLight: "#2a78d6", colorDark: "#3987e5" },
-        { key: "nitrate", label: "Nitrate", locationField: "nitrateAverage", observationField: "nitrate", colorLight: "#eb6834", colorDark: "#d95926" },
-        { key: "nitrite", label: "Nitrite", locationField: "nitriteAverage", observationField: "nitrite", colorLight: "#1baf7a", colorDark: "#199e70" },
-        { key: "ammonia", label: "Ammonia", locationField: "ammoniaAverage", observationField: "ammonia", colorLight: "#eda100", colorDark: "#c98500" },
-        { key: "turbidity", label: "Turbidity", locationField: "turbidityAverage", observationField: "turbidity", colorLight: "#e87ba4", colorDark: "#d55181" },
-        { key: "conductivity", label: "Conductivity", locationField: "conductivityAverage", observationField: "conductivity", colorLight: "#008300", colorDark: "#008300" }
+        { key: "phosphate", label: "Phosphate", locationField: "phosphateAverage", observationField: "phosphate", colorLight: "#2a78d6", colorDark: "#3987e5", aggregation: "mean", unit: "mg/L" },
+        { key: "nitrate", label: "Nitrate", locationField: "nitrateAverage", observationField: "nitrate", colorLight: "#eb6834", colorDark: "#d95926", aggregation: "median", unit: "mg/L" },
+        { key: "nitrite", label: "Nitrite", locationField: "nitriteAverage", observationField: "nitrite", colorLight: "#1baf7a", colorDark: "#199e70", aggregation: "median", unit: "mg/L" },
+        { key: "ammonia", label: "Ammonia", locationField: "ammoniaAverage", observationField: "ammonia", colorLight: "#eda100", colorDark: "#c98500", aggregation: "median", unit: "mg/L" },
+        { key: "turbidity", label: "Turbidity", locationField: "turbidityAverage", observationField: "turbidity", colorLight: "#e87ba4", colorDark: "#d55181", aggregation: "mean", unit: "NTU" },
+        { key: "conductivity", label: "Conductivity", locationField: "conductivityAverage", observationField: "conductivity", colorLight: "#008300", colorDark: "#008300", aggregation: "mean", unit: "uS/cm" }
       ];
 
       // Every wildlife species the app tags in the details panel, and its
@@ -4744,9 +4750,24 @@
         return (value === null || value === undefined) ? "-" : Number(value).toFixed(1);
       }
 
-      // --- Populates the details panel's 4 stat boxes (Total Surveys/Avg
-      //     Phosphate/Avg Nitrate/Avg Turbidity) for whichever site is
-      //     primary. Reads the SAME live, date-filtered aggregate as the
+      // --- Middle value of a list of numbers: sort a copy (never mutate the
+      //     caller's array), then either the exact middle entry (odd count)
+      //     or the average of the two middle entries (even count). Used by
+      //     recomputeLeagueRows for any metric whose METRIC_CATALOG entry
+      //     says aggregation: "median" - see the comment above
+      //     METRIC_CATALOG for why ammonia/nitrate/nitrite use this instead
+      //     of a plain mean. ---
+      function median(values) {
+        if (!values.length) return null;
+        const sorted = values.slice().sort(function (a, b) { return a - b; });
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+      }
+
+      // --- Populates the details panel's stat boxes (Total Surveys, plus
+      //     one per METRIC_CATALOG entry - mean or median per that entry's
+      //     `aggregation`) for whichever site is primary. Reads the SAME
+      //     live, date-filtered aggregate as the
       //     map symbology and league table (`leagueRows`) rather than the
       //     location's stored all-time average fields, so these numbers
       //     move with the date range too. `leagueRows` may not have this
@@ -4817,7 +4838,12 @@
         { field: "locationName", label: "Location", type: "text" },
         { field: "totalSurveys", label: "Surveys", type: "number" }
       ].concat(METRIC_CATALOG.map(function (m) {
-        return { field: m.locationField, label: m.label, type: "number" };
+        // "Median" or "Avg" prefix reflects how recomputeLeagueRows actually
+        // rolled this column up (see METRIC_CATALOG's aggregation field),
+        // and the unit comes along too so the column header alone tells you
+        // what a "0.4" in that column means.
+        const prefix = m.aggregation === "median" ? "Median" : "Avg";
+        return { field: m.locationField, label: prefix + " " + m.label + " (" + m.unit + ")", type: "number" };
       }));
 
       let orgSiteList = []; // [{ locationID, locationName }] for the org currently shown
@@ -4847,9 +4873,13 @@
             const values = obsForSite
               .map(function (o) { return o.attributes[m.observationField]; })
               .filter(function (v) { return v !== null && v !== undefined; });
-            row[m.locationField] = values.length
-              ? values.reduce(function (a, b) { return a + b; }, 0) / values.length
-              : null;
+            if (!values.length) {
+              row[m.locationField] = null;
+            } else if (m.aggregation === "median") {
+              row[m.locationField] = median(values);
+            } else {
+              row[m.locationField] = values.reduce(function (a, b) { return a + b; }, 0) / values.length;
+            }
           });
           return row;
         });
@@ -6083,27 +6113,27 @@
             </div>
             <div class="statBox">
               <div class="value" id="statPhosphate"></div>
-              <div class="label">Avg Phosphate</div>
+              <div class="label">Avg Phosphate (mg/L)</div>
             </div>
             <div class="statBox">
               <div class="value" id="statNitrate"></div>
-              <div class="label">Avg Nitrate</div>
+              <div class="label">Median Nitrate (mg/L)</div>
             </div>
             <div class="statBox">
               <div class="value" id="statNitrite"></div>
-              <div class="label">Avg Nitrite</div>
+              <div class="label">Median Nitrite (mg/L)</div>
             </div>
             <div class="statBox">
               <div class="value" id="statAmmonia"></div>
-              <div class="label">Avg Ammonia</div>
+              <div class="label">Median Ammonia (mg/L)</div>
             </div>
             <div class="statBox">
               <div class="value" id="statTurbidity"></div>
-              <div class="label">Avg Turbidity</div>
+              <div class="label">Avg Turbidity (NTU)</div>
             </div>
             <div class="statBox">
               <div class="value" id="statConductivity"></div>
-              <div class="label">Avg Conductivity</div>
+              <div class="label">Avg Conductivity (uS/cm)</div>
             </div>
           </div>
 
