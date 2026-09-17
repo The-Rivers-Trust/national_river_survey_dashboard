@@ -1459,6 +1459,16 @@
       opacity: 0.75;
     }
 
+    /* Shown in the tooltip only for a point flagged atLimit - see
+       showPointAt() and the matching ring drawn around the point itself
+       in renderChart(). Deliberately a fixed red, not a theme variable,
+       to match the ring's color on both surfaces. */
+    .chartTooltip .ttLimit {
+      color: #ff8a80;
+      font-size: 10px;
+      margin-top: 2px;
+    }
+
     /* --- Comparing two sites stacks one reading-block per site inside the
        same tooltip, separated by a hairline rather than two floating
        tooltips. --- */
@@ -1505,6 +1515,29 @@
       height: 0;
       background: none;
       border-top: 2px dashed var(--legend-color);
+    }
+
+    /* --- Key for the faint red ring drawn around any chart point whose
+       reading was at/beyond the equipment's detection limit (see
+       METRIC_CATALOG's equipmentLimitField and renderChart) - shown under
+       the chart only when the currently plotted points include at least
+       one flagged one. --- */
+    .chartLimitNote {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .chartLimitNote .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid rgba(214, 45, 38, 0.55);
+      flex-shrink: 0;
     }
 
     /* --- Site league table --- */
@@ -1638,6 +1671,103 @@
       font-size: 9px;
     }
 
+    /* --- Organisation details: currently just "what equipment is this
+       org using" (one card per metric, the device behind its most recent
+       reading anywhere in the organisation - see renderOrgDetails), but
+       meant to grow into a fuller "about this org" page over time. Shares
+       #leagueArea's box/header/empty-state look (.leagueHeader,
+       .leagueOrgName, its own #orgDetailsEmpty mirrors #leagueEmpty)
+       rather than duplicating it, so the two tabs read as one family. --- */
+    #orgArea {
+      display: none;
+      flex-grow: 1;
+      min-width: 0;
+      padding: 24px 32px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      background: var(--surface-1);
+      color: var(--text-primary);
+    }
+
+    #orgDetailsEmpty {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    #orgArea h3 {
+      font-size: 14px;
+      margin: 0 0 10px;
+      color: var(--text-primary);
+    }
+
+    .equipCardGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .equipCard {
+      background: var(--surface-2);
+      border-radius: 6px;
+      padding: 12px 14px;
+      border-top: 3px solid var(--metric-color, var(--border-strong));
+    }
+
+    .equipCard .equipMetric {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .equipCard .equipName {
+      font-size: 14px;
+      font-weight: bold;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .equipCard .equipManufacturer {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .equipCard .equipSpecRow {
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 3px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .equipCard .equipSpecRow span:last-child {
+      color: var(--text-primary);
+      text-align: right;
+    }
+
+    .equipCard .equipDocsLink {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .equipCard .equipDocsLink:hover {
+      text-decoration: underline;
+    }
+
+    .equipCard .equipNoData {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
     /* --- Small screens (phones, narrow tablets): the desktop layout is
        three side-by-side fixed-width columns (320px sidebar + map + 320px
        details panel) inside a non-scrolling 100%-height shell - that
@@ -1718,6 +1848,10 @@
         padding: 16px;
       }
 
+      #orgArea {
+        padding: 16px;
+      }
+
       /* Bigger touch targets for the carousel's prev/next - 26px is a
          mouse-pointer size, too small to comfortably tap. */
       .surveyNavBtn {
@@ -1783,7 +1917,7 @@
       ];
       // ================================================================
 
-      const BASE_URL = "https://services3.arcgis.com/Bb8lfThdhugyc4G3/arcgis/rest/services/National_River_Survey_Testing_Layer/FeatureServer";
+      const BASE_URL = "https://services3.arcgis.com/Bb8lfThdhugyc4G3/arcgis/rest/services/National_River_Survey/FeatureServer";
 
       // --- Light/dark: which mode is currently active. Everything drawn
       //     with plain CSS just reads the custom properties on
@@ -2439,16 +2573,21 @@
       }
 
       // --- Fixed colors for the map's selection rings and (when comparing
-      //     two sites) the chart's two lines and its legend. Deliberately
-      //     outside every hue already used by METRIC_CATALOG (blue/orange/
-      //     teal/amber/pink/green) so a selection or comparison line never
-      //     looks like it's telling you about a different metric. Index 1
-      //     (cyan) is the everyday "this is selected" color - used both for
-      //     a single selected site and for the second site in a comparison;
-      //     index 0 (violet) only appears for the first site once a second
-      //     one is added, so two sites read as clearly different places
-      //     rather than two of the same ring. See updateCompareHighlights
-      //     for exactly how the index is picked. ---
+      //     two sites) the chart's two lines and its legend. Chosen to sit
+      //     outside every hue METRIC_CATALOG used at the time (blue/
+      //     orange/teal/amber/pink/green) so a selection or comparison
+      //     line never looks like it's telling you about a different
+      //     metric - since then, temperature was added in the palette's
+      //     own next slot (violet), which does sit close to index 0 below.
+      //     That's a known, deliberate tradeoff - see the comment above
+      //     METRIC_CATALOG's temperature entry - rather than a reason to
+      //     re-pick either color from scratch. Index 1 (cyan) is the
+      //     everyday "this is selected" color - used both for a single
+      //     selected site and for the second site in a comparison; index 0
+      //     (violet) only appears for the first site once a second one is
+      //     added, so two sites read as clearly different places rather
+      //     than two of the same ring. See updateCompareHighlights for
+      //     exactly how the index is picked. ---
       const COMPARE_SITE_COLORS = [
         { light: "#6d3fc9", dark: "#9b6cf5" },
         { light: "#0e8fa3", dark: "#3fd0e0" }
@@ -2509,7 +2648,7 @@
       // raw per-survey field on the observations table, which drives the
       // trend chart. Colors are the dataviz palette's fixed categorical
       // order - kept in that order so the set stays colorblind-safe however
-      // many of the six an org ends up collecting. `colorDark`/`colorLight`
+      // many of the seven an org ends up collecting. `colorDark`/`colorLight`
       // are each metric's variant for the dark/light surface respectively -
       // metricColor() picks between them by currentTheme, and every place
       // that shows a metric's color reads it through that function rather
@@ -2517,16 +2656,39 @@
       // recomputeLeagueRows rolls up a site's readings into `locationField`
       // - "mean" or "median" - per River Trust guidance: ammonia, nitrate
       // and nitrite are skewed by occasional spikes, so their site-level
-      // figure is a median, while phosphate/turbidity/conductivity stay a
-      // plain average. `unit` is just for display (league table column
-      // headers, stat box labels) and never enters the maths.
+      // figure is a median, while phosphate/turbidity/conductivity/
+      // temperature stay a plain average. `unit` is just for display
+      // (league table column headers, stat box labels) and never enters
+      // the maths.
+      // `equipmentLimitField` is each metric's companion field on the
+      // Observations table recording whether that particular reading was
+      // at or beyond the equipment's detection range (values look like
+      // "<", "<=", ">", "=>" - null when the reading was a normal in-range
+      // value). Used only by the trend chart, to flag those points - see
+      // groupObservationsByDay and renderChart.
+      //
+      // Colors are the dataviz palette's validated 8-slot categorical
+      // order (references/palette.md in the dataviz skill) taken in
+      // sequence - slots 1-6 (blue/orange/aqua/yellow/magenta/green) for
+      // the original six metrics, slot 7 (violet) for temperature added
+      // after. One deliberate wrinkle: slot 7's violet sits close to
+      // COMPARE_SITE_COLORS[0] (also violet, chosen back when only 6
+      // metrics existed to be "outside every metric hue") - so a compared
+      // site's ring can read as low-contrast against its own marker
+      // specifically when Temperature is the selected metric. Slot 8 (red)
+      // was ruled out instead: it reads too close to the chart's
+      // equipment-detection-limit ring color (see colLimitFlag in
+      // renderChart), which every metric - temperature included - can
+      // show, so a red temperature series would make that ring nearly
+      // invisible on every one of its own flagged points.
       const METRIC_CATALOG = [
-        { key: "phosphate", label: "Phosphate", locationField: "phosphateAverage", observationField: "phosphate", colorLight: "#2a78d6", colorDark: "#3987e5", aggregation: "mean", unit: "mg/L" },
-        { key: "nitrate", label: "Nitrate", locationField: "nitrateAverage", observationField: "nitrate", colorLight: "#eb6834", colorDark: "#d95926", aggregation: "median", unit: "mg/L" },
-        { key: "nitrite", label: "Nitrite", locationField: "nitriteAverage", observationField: "nitrite", colorLight: "#1baf7a", colorDark: "#199e70", aggregation: "median", unit: "mg/L" },
-        { key: "ammonia", label: "Ammonia", locationField: "ammoniaAverage", observationField: "ammonia", colorLight: "#eda100", colorDark: "#c98500", aggregation: "median", unit: "mg/L" },
-        { key: "turbidity", label: "Turbidity", locationField: "turbidityAverage", observationField: "turbidity", colorLight: "#e87ba4", colorDark: "#d55181", aggregation: "mean", unit: "NTU" },
-        { key: "conductivity", label: "Conductivity", locationField: "conductivityAverage", observationField: "conductivity", colorLight: "#008300", colorDark: "#008300", aggregation: "mean", unit: "uS/cm" }
+        { key: "phosphate", label: "Phosphate", locationField: "phosphateAverage", observationField: "phosphate", equipmentLimitField: "phosphate_equipment_limit", colorLight: "#2a78d6", colorDark: "#3987e5", aggregation: "mean", unit: "mg/L" },
+        { key: "nitrate", label: "Nitrate", locationField: "nitrateAverage", observationField: "nitrate", equipmentLimitField: "nitrate_equipment_limit", colorLight: "#eb6834", colorDark: "#d95926", aggregation: "median", unit: "mg/L" },
+        { key: "nitrite", label: "Nitrite", locationField: "nitriteAverage", observationField: "nitrite", equipmentLimitField: "nitrite_equipment_limit", colorLight: "#1baf7a", colorDark: "#199e70", aggregation: "median", unit: "mg/L" },
+        { key: "ammonia", label: "Ammonia", locationField: "ammoniaAverage", observationField: "ammonia", equipmentLimitField: "ammonia_equipment_limit", colorLight: "#eda100", colorDark: "#c98500", aggregation: "median", unit: "mg/L" },
+        { key: "turbidity", label: "Turbidity", locationField: "turbidityAverage", observationField: "turbidity", equipmentLimitField: "turbidity_equipment_limit", colorLight: "#e87ba4", colorDark: "#d55181", aggregation: "mean", unit: "NTU" },
+        { key: "conductivity", label: "Conductivity", locationField: "conductivityAverage", observationField: "conductivity", equipmentLimitField: "conductivity_equipment_limit", colorLight: "#008300", colorDark: "#008300", aggregation: "mean", unit: "uS/cm" },
+        { key: "temperature", label: "Temperature", locationField: "temperatureAverage", observationField: "water_temperature", equipmentLimitField: "water_temperature_equipment_limit", colorLight: "#4a3aa7", colorDark: "#9085e9", aggregation: "mean", unit: "°C" }
       ];
 
       // Every wildlife species the app tags in the details panel, and its
@@ -2573,7 +2735,7 @@
       }
 
       // --- Builds an Arcade Decode() expression mapping each site's
-      //     locationID to its live value for `field` in `rows` (the
+      //     GlobalID to its live value for `field` in `rows` (the
       //     current `leagueRows`) - used as a size visual variable's
       //     valueExpression instead of a literal field name, since the
       //     values being sized by are computed client-side from
@@ -2590,7 +2752,7 @@
           cases.push("'" + escapeArcadeString(row.locationID) + "'");
           cases.push(String(value));
         });
-        return "Decode($feature.locationID, " + cases.join(", ") + ", null)";
+        return "Decode($feature.GlobalID, " + cases.join(", ") + ", null)";
       }
 
       // Shared prefix for the two phosphate-WFD Arcade expressions below
@@ -2898,7 +3060,7 @@
       }
       const allSitesLayer = new FeatureLayer({
         url: BASE_URL + "/1",
-        outFields: ["locationID", "locationName", "organisationName"],
+        outFields: ["GlobalID", "location_name", "organisation_id"],
         popupEnabled: false,
         visible: false,
         renderer: buildAllSitesRenderer(currentTheme)
@@ -2908,6 +3070,56 @@
       const observationsTable = new FeatureLayer({
         url: BASE_URL + "/2"
       });
+
+      // Used only for looking up equipment specs for the Organisation
+      // details tab - never added to the map. Small (the same handful of
+      // devices seen in load_NRS_data_v2's equipment_map) and effectively
+      // static, so it's queried once at startup rather than per
+      // organisation - see loadEquipmentSpecs and equipmentSpecByGuid.
+      const equipmentTable = new FeatureLayer({
+        url: BASE_URL + "/3"
+      });
+
+      // GlobalID (normalized - see normalizeGuid) -> that Equipment row's
+      // full spec, for the Organisation details tab's equipment cards
+      // (see renderOrgDetails). Empty until loadEquipmentSpecs() resolves.
+      let equipmentSpecByGuid = {};
+
+      // The Python loader (load_NRS_data_v2) strips braces and lowercases
+      // every GUID it writes onto a location/organisation, but an
+      // observation's own `<metric>_equipment_id` is copied straight from
+      // querying the Equipment table via the ArcGIS Python API, which
+      // returns GlobalIDs braced and upper-cased - and this JS API's own
+      // GlobalID values aren't guaranteed to match that shape either.
+      // Normalizing both sides before ever comparing or keying by one
+      // means a shape mismatch can never cause a silent no-match.
+      function normalizeGuid(guid) {
+        return guid ? String(guid).replace(/[{}]/g, "").toLowerCase() : guid;
+      }
+
+      // One-time load of every Equipment row's full spec, keyed by its own
+      // GlobalID - see equipmentSpecByGuid above. Re-renders the
+      // Organisation details tab once it resolves, so its equipment cards
+      // still fill in even if an organisation was already selected before
+      // this finished.
+      function loadEquipmentSpecs() {
+        const query = equipmentTable.createQuery();
+        query.where = "1=1";
+        query.outFields = [
+          "GlobalID", "equipment_name", "manafacturer_name",
+          "documentation_url", "determinand", "range_bottom",
+          "range_top", "unit", "statistic_measure"
+        ];
+        return equipmentTable.queryFeatures(query).then(function (result) {
+          result.features.forEach(function (f) {
+            equipmentSpecByGuid[normalizeGuid(f.attributes.GlobalID)] = f.attributes;
+          });
+          renderOrgDetails();
+        }).catch(function (err) {
+          console.error("Failed to load equipment specs.", err);
+        });
+      }
+      loadEquipmentSpecs();
 
       // --- Optional reference layer: the Environment Agency's WFD (Water
       //     Framework Directive) river water body catchments, cycle 4 -
@@ -4223,6 +4435,7 @@
       const sidebarEl = document.getElementById("sidebar");
       const mapArea = document.getElementById("mapArea");
       const leagueArea = document.getElementById("leagueArea");
+      const orgArea = document.getElementById("orgArea");
 
       tabButtons.forEach(function (btn) {
         btn.addEventListener("click", function () { switchTab(btn.dataset.tab); });
@@ -4234,15 +4447,27 @@
           btn.classList.toggle("active", btn.dataset.tab === tab);
         });
         // The sidebar (metric picker + contextual layers) only means
-        // anything on the map - hidden on the league tab so the table gets
-        // the full width, same idea as mapArea below.
-        sidebarEl.style.display = tab === "league" ? "none" : "flex";
+        // anything on the map - hidden on the other tabs so they get the
+        // full width, same idea as mapArea below.
+        sidebarEl.style.display = tab === "map" ? "flex" : "none";
         mapArea.style.display = tab === "map" ? "flex" : "none";
         leagueArea.style.display = tab === "league" ? "block" : "none";
+        orgArea.style.display = tab === "org" ? "block" : "none";
         updateMetricPanelVisibility();
 
         if (tab === "league") {
           loadLeagueTable(orgFilter.value);
+        }
+
+        // Organisation details doesn't need its own requery - it's built
+        // purely from data the league table's own load already fetches
+        // (see loadLeagueTable/renderOrgDetails), so it's already current
+        // whenever this tab is switched to; re-running it here just picks
+        // up anything that could only change while this tab was hidden
+        // (e.g. a theme change, which affects each equipment card's
+        // color-coded top border).
+        if (tab === "org") {
+          renderOrgDetails();
         }
 
         // The chart panel is measured from its own rendered size (see
@@ -4253,6 +4478,16 @@
           renderChart();
         }
       }
+
+      // The selected organisation's own GlobalID - Locations only link back
+      // to their organisation via organisation_id (a GUID FK), there's no
+      // organisation name field on Locations any more, so every place that
+      // used to filter locationsLayer/allSitesLayer by organisationName
+      // text now needs this instead. Set (and cleared) exclusively by
+      // selectOrganisation below - null whenever no organisation is
+      // selected, or while the org just picked from the dropdown is still
+      // being resolved to its GUID.
+      let currentOrgGuid = null;
 
       // --- Populate the organisation dropdown with real values from the data ---
       // We query for DISTINCT organisation_name values rather than hardcoding
@@ -4289,9 +4524,8 @@
       //     clicking the polygon directly) we skip the extra query and
       //     zoom straight to it. The dropdown doesn't have geometry on
       //     hand, so it's looked up. ---
-      function selectOrganisation(orgName, geometry) {
+      function selectOrganisation(orgName, geometry, orgGuid) {
         orgFilter.value = orgName || "";
-        loadLeagueTable(orgName || "");
         // Whatever location was selected (glow, details panel, chart)
         // belonged to the previous org - never carry it over to a
         // different org's map, or leave it showing once every org is
@@ -4306,6 +4540,8 @@
         updateMetricPanelVisibility();
 
         if (!orgName) {
+          currentOrgGuid = null;
+          loadLeagueTable("");
           organisationLayer.definitionExpression = "";
           locationsLayer.visible = false;
           locationsLayer.definitionExpression = "";
@@ -4329,27 +4565,41 @@
         // selected one on the map.
         organisationLayer.definitionExpression = `organisation_name = '${escapedName}'`;
 
-        if (geometry) {
+        // Everything below (the league table, and the two site layers)
+        // needs this organisation's actual GlobalID, not just its name -
+        // see currentOrgGuid above. Clicking the polygon directly already
+        // hands us both its geometry and its attributes (so orgGuid is
+        // already known); the dropdown has neither, so one query gets us
+        // both at once.
+        function proceedWithOrg(resolvedGuid) {
+          currentOrgGuid = resolvedGuid;
+          loadLeagueTable(orgName);
+          locationsLayer.visible = true;
+          applyLocationFilter();
+          // Narrowed to zero-survey sites once leagueRows is actually
+          // populated - see applyAllSitesFilter. Not narrowed further by
+          // any league-table selection the way locationsLayer is above.
+          applyAllSitesFilter();
+        }
+
+        if (geometry && orgGuid) {
           view.goTo(geometry);
+          proceedWithOrg(orgGuid);
         } else {
           const query = organisationLayer.createQuery();
           query.where = `organisation_name = '${escapedName}'`;
           query.returnGeometry = true;
-          query.outFields = ["organisation_name"];
+          query.outFields = ["organisation_name", "GlobalID"];
 
           organisationLayer.queryFeatures(query).then(function (result) {
             if (result.features.length > 0) {
               view.goTo(result.features[0].geometry);
+              proceedWithOrg(result.features[0].attributes.GlobalID);
+            } else {
+              proceedWithOrg(null);
             }
           });
         }
-
-        locationsLayer.visible = true;
-        applyLocationFilter();
-        // Narrowed to zero-survey sites once leagueRows is actually
-        // populated - see applyAllSitesFilter. Not narrowed further by any
-        // league-table selection the way locationsLayer is above.
-        applyAllSitesFilter();
       }
 
       // Escapes a value for safe embedding in a definitionExpression string
@@ -4366,9 +4616,11 @@
       // table's checkboxes only ever narrow the map down, they don't have
       // to be used at all.
       function applyLocationFilter() {
-        const orgName = orgFilter.value;
-        if (!orgName) return;
-        let where = `organisationName = '${escapeSql(orgName)}'`;
+        // currentOrgGuid isn't known yet the instant an org is first picked
+        // from the dropdown (see selectOrganisation) - this gets called
+        // again once it resolves, so bailing out here for a moment is fine.
+        if (!currentOrgGuid) return;
+        let where = `organisation_id = '${escapeSql(currentOrgGuid)}'`;
 
         // Only show sites with at least one survey in the current date
         // range - see recomputeLeagueRows. A site with none instead shows
@@ -4383,12 +4635,12 @@
           where += ` AND 1 = 0`;
         } else {
           const surveyedList = surveyedIDs.map(function (id) { return `'${escapeSql(id)}'`; }).join(", ");
-          where += ` AND locationID IN (${surveyedList})`;
+          where += ` AND GlobalID IN (${surveyedList})`;
         }
 
         if (leagueSelectedIDs.size > 0) {
           const ids = Array.from(leagueSelectedIDs).map(function (id) { return `'${escapeSql(id)}'`; }).join(", ");
-          where += ` AND locationID IN (${ids})`;
+          where += ` AND GlobalID IN (${ids})`;
         }
         locationsLayer.definitionExpression = where;
       }
@@ -4403,9 +4655,8 @@
       // "what hasn't been surveyed yet" reference, not part of the
       // site-comparison selection.
       function applyAllSitesFilter() {
-        const orgName = orgFilter.value;
-        if (!orgName) return;
-        let where = `organisationName = '${escapeSql(orgName)}'`;
+        if (!currentOrgGuid) return;
+        let where = `organisation_id = '${escapeSql(currentOrgGuid)}'`;
 
         const unsurveyedIDs = leagueRows.filter(function (r) { return r.totalSurveys === 0; }).map(function (r) { return r.locationID; });
         if (unsurveyedIDs.length === 0) {
@@ -4415,7 +4666,7 @@
           where += ` AND 1 = 0`;
         } else {
           const unsurveyedList = unsurveyedIDs.map(function (id) { return `'${escapeSql(id)}'`; }).join(", ");
-          where += ` AND locationID IN (${unsurveyedList})`;
+          where += ` AND GlobalID IN (${unsurveyedList})`;
         }
         allSitesLayer.definitionExpression = where;
       }
@@ -4682,7 +4933,7 @@
 
           if (orgResult) {
             const orgName = orgResult.graphic.attributes.organisation_name;
-            if (orgName) selectOrganisation(orgName, orgResult.graphic.geometry);
+            if (orgName) selectOrganisation(orgName, orgResult.graphic.geometry, orgResult.graphic.attributes.GlobalID);
           }
         });
       });
@@ -4697,7 +4948,7 @@
       //     and drives the details panel/survey carousel below; every
       //     selected site (1 or 2) gets its own line on the trend chart. ---
       function handleLocationClick(graphic, addToCompare) {
-        const locationID = graphic.attributes.locationID;
+        const locationID = graphic.attributes.GlobalID;
 
         if (addToCompare) {
           const existingIndex = selectedSites.findIndex(function (s) { return s.locationID === locationID; });
@@ -4729,10 +4980,14 @@
         document.getElementById("chartPlaceholder").style.display = "none";
         document.getElementById("trendChartRoot").style.display = "flex";
 
-        document.getElementById("locationName").innerText = attrs.locationName || "(unnamed location)";
-        document.getElementById("locationOrg").innerText = attrs.organisationName || "";
+        document.getElementById("locationName").innerText = attrs.location_name || "(unnamed location)";
+        // Locations no longer carry their organisation's name directly
+        // (only organisation_id, a GUID) - but locationsLayer only ever
+        // shows the currently-selected organisation's sites anyway, so its
+        // name is just whatever the dropdown is currently set to.
+        document.getElementById("locationOrg").innerText = orgFilter.value || "";
 
-        updateStatsForPrimary(attrs.locationID);
+        updateStatsForPrimary(attrs.GlobalID);
 
         // Wildlife/invasive species tags now come from per-survey
         // sightings within the current date range (see
@@ -4779,9 +5034,10 @@
         document.getElementById("statSurveys").innerText = row ? row.totalSurveys : "-";
         // One stat box per METRIC_CATALOG entry (statPhosphate,
         // statNitrate, statNitrite, statAmmonia, statTurbidity,
-        // statConductivity - ids follow "stat" + the metric's capitalized
-        // key) rather than each hardcoded individually, so all 6 metrics
-        // stay in sync with the catalog automatically. A metric this
+        // statConductivity, statTemperature - ids follow "stat" + the
+        // metric's capitalized key) rather than each hardcoded
+        // individually, so all 7 metrics stay in sync with the catalog
+        // automatically. A metric this
         // organisation isn't collecting (not in `availableMetrics` - see
         // updateAvailableMetrics, same check the sidebar's metric list
         // uses) hides its whole box rather than showing an empty "-", so
@@ -4823,9 +5079,9 @@
       //     Getting there takes two queries per organisation (not
       //     per date-range change): `orgSiteList` is just the org's site
       //     id/name pairs, from `locationsLayer`; `orgObservations` is
-      //     every one of those sites' observations - locationID,
-      //     created_at, and the 6 metric fields only, no photos/weather/
-      //     etc, since no aggregate here needs them - from
+      //     every one of those sites' observations - location_id,
+      //     time_of_observation, and the 6 metric fields only, no photos/
+      //     weather/etc, since no aggregate here needs them - from
       //     `observationsTable`. `recomputeLeagueRows` then re-derives
       //     `leagueRows` from those two, filtered to the current date
       //     range, purely client-side - no requery needed to react to a
@@ -4865,7 +5121,7 @@
       function recomputeLeagueRows() {
         leagueRows = orgSiteList.map(function (site) {
           const obsForSite = orgObservations.filter(function (o) {
-            return o.attributes.locationID === site.locationID && isWithinDateRange(o.attributes.created_at);
+            return o.attributes.location_id === site.locationID && isWithinDateRange(o.attributes.time_of_observation);
           });
 
           const row = { locationID: site.locationID, locationName: site.locationName, totalSurveys: obsForSite.length };
@@ -4897,6 +5153,7 @@
         leagueRows = [];
         wrapEl.style.display = "none";
         updateAvailableMetrics();
+        renderOrgDetails();
 
         if (!orgName) {
           subtitleEl.textContent = "";
@@ -4909,11 +5166,23 @@
         emptyEl.textContent = "Loading sites...";
         emptyEl.hidden = false;
 
-        const escapedName = orgName.replace(/'/g, "''");
+        // selectOrganisation only calls this once currentOrgGuid has
+        // actually resolved (or not - see below) for this org, so there's
+        // nothing left to look up here, unlike the old organisationName
+        // text match this used to do directly.
+        if (!currentOrgGuid) {
+          emptyEl.textContent = "No sites found for this organisation.";
+          emptyEl.hidden = false;
+          recomputeLeagueRows();
+          updateAvailableMetrics();
+          renderOrgDetails();
+          return;
+        }
+
         const siteQuery = locationsLayer.createQuery();
-        siteQuery.where = `organisationName = '${escapedName}'`;
+        siteQuery.where = `organisation_id = '${escapeSql(currentOrgGuid)}'`;
         siteQuery.returnGeometry = false;
-        siteQuery.outFields = ["locationID", "locationName"];
+        siteQuery.outFields = ["GlobalID", "location_name"];
 
         locationsLayer.queryFeatures(siteQuery).then(function (siteResult) {
           // A stale response for an org the user has since navigated away
@@ -4921,7 +5190,7 @@
           if (orgFilter.value !== orgName) return;
 
           orgSiteList = siteResult.features.map(function (f) {
-            return { locationID: f.attributes.locationID, locationName: f.attributes.locationName };
+            return { locationID: f.attributes.GlobalID, locationName: f.attributes.location_name };
           });
 
           if (orgSiteList.length === 0) {
@@ -4929,6 +5198,7 @@
             emptyEl.hidden = false;
             recomputeLeagueRows();
             updateAvailableMetrics();
+            renderOrgDetails();
             return;
           }
 
@@ -4936,9 +5206,16 @@
 
           const idList = orgSiteList.map(function (s) { return `'${escapeSql(s.locationID)}'`; }).join(", ");
           const obsQuery = observationsTable.createQuery();
-          obsQuery.where = `locationID IN (${idList})`;
+          obsQuery.where = `location_id IN (${idList})`;
           obsQuery.returnGeometry = false;
-          obsQuery.outFields = ["locationID", "created_at"].concat(METRIC_CATALOG.map(function (m) { return m.observationField; }));
+          // <metric>_equipment_id fields ride along too - not used by the
+          // league table itself, but this is every observation belonging
+          // to the org (across all its sites), which is exactly what the
+          // Organisation details tab's equipment cards need - see
+          // renderOrgDetails.
+          obsQuery.outFields = ["location_id", "time_of_observation"]
+            .concat(METRIC_CATALOG.map(function (m) { return m.observationField; }))
+            .concat(METRIC_CATALOG.map(function (m) { return m.observationField + "_equipment_id"; }));
 
           return observationsTable.queryFeatures(obsQuery).then(function (obsResult) {
             if (orgFilter.value !== orgName) return;
@@ -4953,6 +5230,7 @@
             wrapEl.style.display = "block";
             renderLeagueTable();
             updateSelectionBar();
+            renderOrgDetails();
 
             // A site may already be selected (e.g. this resolved after a
             // quick click) - its stat boxes were showing "-" placeholders
@@ -4967,6 +5245,141 @@
           emptyEl.hidden = false;
           console.error(error);
         });
+      }
+
+      // --- Organisation details tab: currently just "what equipment is
+      //     this org using" - one card per metric this org actually
+      //     collects (same `availableMetrics` check the league table and
+      //     stat boxes use), naming the device behind that metric's
+      //     single most recent reading anywhere in the organisation - not
+      //     per-site, and not date-range filtered: an organisation's own
+      //     equipment doesn't change, so the latest reading on record
+      //     org-wide is a fine stand-in for "what they're using now".
+      //     Meant to grow into a fuller "about this org" page over time.
+      //
+      //     Pure client-side, from `orgObservations` (every observation
+      //     across every site belonging to the org - see loadLeagueTable,
+      //     which calls this again every time that data changes) and
+      //     `equipmentSpecByGuid` (see loadEquipmentSpecs, which calls
+      //     this again once it resolves) - safe to call any time either
+      //     is still empty/loading, or no organisation is selected at
+      //     all; each just falls through to an emptier state. ---
+      function renderOrgDetails() {
+        const emptyEl = document.getElementById("orgDetailsEmpty");
+        const contentEl = document.getElementById("orgDetailsContent");
+        const subtitleEl = document.getElementById("orgDetailsSubtitle");
+        const gridEl = document.getElementById("equipCardGrid");
+
+        const orgName = orgFilter.value;
+        subtitleEl.textContent = orgName || "";
+
+        if (!orgName) {
+          contentEl.style.display = "none";
+          emptyEl.textContent = "Select an organisation from the sidebar to see its details.";
+          emptyEl.hidden = false;
+          return;
+        }
+
+        if (!currentOrgGuid || orgSiteList.length === 0) {
+          contentEl.style.display = "none";
+          emptyEl.textContent = "No sites found for this organisation.";
+          emptyEl.hidden = false;
+          return;
+        }
+
+        if (orgObservations.length === 0) {
+          contentEl.style.display = "none";
+          emptyEl.textContent = "Loading...";
+          emptyEl.hidden = false;
+          return;
+        }
+
+        emptyEl.hidden = true;
+        contentEl.style.display = "block";
+        gridEl.innerHTML = "";
+
+        METRIC_CATALOG.forEach(function (m) {
+          const collected = availableMetrics.some(function (am) { return am.key === m.key; });
+          if (!collected) return; // this org doesn't measure this metric at all
+
+          // Every reading of this metric across every one of the org's
+          // sites, latest first.
+          const readings = orgObservations
+            .filter(function (o) {
+              const v = o.attributes[m.observationField];
+              return v !== null && v !== undefined;
+            })
+            .sort(function (a, b) { return b.attributes.time_of_observation - a.attributes.time_of_observation; });
+
+          const card = document.createElement("div");
+          card.className = "equipCard";
+          card.style.setProperty("--metric-color", metricColor(m));
+
+          const metricEl = document.createElement("div");
+          metricEl.className = "equipMetric";
+          metricEl.textContent = m.label;
+          card.appendChild(metricEl);
+
+          const guid = readings.length > 0 ? readings[0].attributes[m.observationField + "_equipment_id"] : null;
+          const spec = guid ? equipmentSpecByGuid[normalizeGuid(guid)] : null;
+
+          if (!spec) {
+            const noData = document.createElement("div");
+            noData.className = "equipNoData";
+            noData.textContent = readings.length === 0
+              ? "No readings recorded yet."
+              : "No equipment recorded for the most recent reading.";
+            card.appendChild(noData);
+            gridEl.appendChild(card);
+            return;
+          }
+
+          const nameEl = document.createElement("div");
+          nameEl.className = "equipName";
+          nameEl.textContent = spec.equipment_name || "(unnamed device)";
+          card.appendChild(nameEl);
+
+          if (spec.manafacturer_name) {
+            const mfrEl = document.createElement("div");
+            mfrEl.className = "equipManufacturer";
+            mfrEl.textContent = spec.manafacturer_name;
+            card.appendChild(mfrEl);
+          }
+
+          if (spec.range_bottom !== null && spec.range_bottom !== undefined && spec.range_top !== null && spec.range_top !== undefined) {
+            addEquipSpecRow(card, "Detection range", spec.range_bottom + "–" + spec.range_top + (spec.unit ? " " + spec.unit : ""));
+          }
+          if (spec.statistic_measure) {
+            addEquipSpecRow(card, "Measure", spec.statistic_measure);
+          }
+          addEquipSpecRow(card, "Last used", formatDateLong(readings[0].attributes.time_of_observation));
+
+          if (spec.documentation_url) {
+            const link = document.createElement("a");
+            link.className = "equipDocsLink";
+            link.href = spec.documentation_url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = "Documentation ↗";
+            card.appendChild(link);
+          }
+
+          gridEl.appendChild(card);
+        });
+      }
+
+      // Small helper for renderOrgDetails' equipment cards - one
+      // label/value line (detection range, last-used date, etc).
+      function addEquipSpecRow(card, label, value) {
+        const row = document.createElement("div");
+        row.className = "equipSpecRow";
+        const labelEl = document.createElement("span");
+        labelEl.textContent = label;
+        const valueEl = document.createElement("span");
+        valueEl.textContent = value;
+        row.appendChild(labelEl);
+        row.appendChild(valueEl);
+        card.appendChild(row);
       }
 
       // Renders (and re-renders on every sort change) from the cached
@@ -5149,9 +5562,8 @@
         { field: "weather_snowy", label: "Snowy" }
       ];
 
-      // Up to 4 photos per survey - "Photo4" (capital P) is how the field
-      // is actually named on the service, unlike the lowercase photo1-3.
-      const PHOTO_FIELDS = ["photo1", "photo2", "photo3", "Photo4"];
+      // Up to 4 photos per survey.
+      const PHOTO_FIELDS = ["photo_1", "photo_2", "photo_3", "photo_4"];
 
       // Free-text fields (clarity, water_level, water_flow, rain) come back
       // lowercase from the source form (e.g. "clear", "steady") - title-case
@@ -5161,29 +5573,29 @@
       }
 
       // --- Query the Observations table for one location's full survey
-      //     history, cached by locationID so a site already fetched (e.g.
-      //     still selected as the comparison site while you flick through
-      //     metrics, or re-selected later) never gets requeried.
-      //     locationID is a GUID field - the value from the location
-      //     graphic already comes back wrapped in curly braces, so we just
-      //     quote it. Returns a promise resolving to the cache entry. ---
+      //     history, cached by locationID (the location's own GlobalID) so
+      //     a site already fetched (e.g. still selected as the comparison
+      //     site while you flick through metrics, or re-selected later)
+      //     never gets requeried. Returns a promise resolving to the cache
+      //     entry. ---
       function fetchSiteObservations(locationID) {
         if (siteDataCache[locationID]) {
           return Promise.resolve(siteDataCache[locationID]);
         }
 
         const query = observationsTable.createQuery();
-        query.where = `locationID = '${locationID}'`;
+        query.where = `location_id = '${locationID}'`;
         query.outFields = [
-          "created_at", "water_temperature", "conductivity",
+          "time_of_observation", "water_temperature", "conductivity",
           "turbidity", "phosphate", "nitrate", "nitrite",
           "ammonia", "clarity", "water_level", "water_flow",
           "rain_previous_24hrs"
-        ].concat(WEATHER_FIELDS.map(function (w) { return w.field; }))
+        ].concat(METRIC_CATALOG.map(function (m) { return m.equipmentLimitField; }))
+          .concat(WEATHER_FIELDS.map(function (w) { return w.field; }))
           .concat(PHOTO_FIELDS)
           .concat(WILDLIFE_FIELDS.map(function (w) { return w.observationField; }))
           .concat(INVASIVE_PLANT_FIELDS.map(function (w) { return w.observationField; }));
-        query.orderByFields = ["created_at ASC"]; // ascending - the chart needs oldest-first
+        query.orderByFields = ["time_of_observation ASC"]; // ascending - the chart needs oldest-first
 
         return observationsTable.queryFeatures(query).then(function (result) {
           // Cached as the full, unfiltered history - `recentObservations`
@@ -5214,7 +5626,7 @@
         const cached = siteDataCache[locationID];
         if (!cached) return [];
         return cached.currentObservations
-          .filter(function (f) { return isWithinDateRange(f.attributes.created_at); })
+          .filter(function (f) { return isWithinDateRange(f.attributes.time_of_observation); })
           .slice(-5)
           .reverse();
       }
@@ -5256,7 +5668,7 @@
           return;
         }
 
-        const obsInRange = cached.currentObservations.filter(function (f) { return isWithinDateRange(f.attributes.created_at); });
+        const obsInRange = cached.currentObservations.filter(function (f) { return isWithinDateRange(f.attributes.time_of_observation); });
         renderSightingTags("wildlifeTags", "wildlifeTag", WILDLIFE_FIELDS, obsInRange);
       }
 
@@ -5270,7 +5682,7 @@
           return;
         }
 
-        const obsInRange = cached.currentObservations.filter(function (f) { return isWithinDateRange(f.attributes.created_at); });
+        const obsInRange = cached.currentObservations.filter(function (f) { return isWithinDateRange(f.attributes.time_of_observation); });
         renderSightingTags("invasiveTags", "invasiveTag", INVASIVE_PLANT_FIELDS, obsInRange);
       }
 
@@ -5345,7 +5757,7 @@
         prevBtn.disabled = surveyIndex === 0;
         nextBtn.disabled = surveyIndex === recentObservations.length - 1;
 
-        const dateStr = a.created_at ? formatDateLong(a.created_at) : "Unknown date";
+        const dateStr = a.time_of_observation ? formatDateLong(a.time_of_observation) : "Unknown date";
 
         const weatherTagsHtml = WEATHER_FIELDS
           .filter(function (w) { return a[w.field]; })
@@ -5478,9 +5890,9 @@
 
         features.forEach(function (f) {
           const a = f.attributes;
-          if (a.created_at === null || a.created_at === undefined) return;
+          if (a.time_of_observation === null || a.time_of_observation === undefined) return;
 
-          const d = new Date(a.created_at);
+          const d = new Date(a.time_of_observation);
           const dayKey = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
 
           if (!byDay[dayKey]) {
@@ -5497,20 +5909,33 @@
             if (!entry.sums[m.observationField]) entry.sums[m.observationField] = { total: 0, count: 0 };
             entry.sums[m.observationField].total += v;
             entry.sums[m.observationField].count += 1;
+
+            // A day can combine more than one survey (see this function's
+            // header comment) - if ANY of the readings averaged into this
+            // day's point for this metric was at/beyond the equipment's
+            // detection limit, the whole point is flagged as such. The
+            // specific "<"/"<="/">"/"=>"  isn't kept per point (a day could
+            // combine one of each), just the fact that at least one applies.
+            const limitValue = a[m.equipmentLimitField];
+            if (limitValue !== null && limitValue !== undefined && limitValue !== "") {
+              entry.atLimit = entry.atLimit || {};
+              entry.atLimit[m.observationField] = true;
+            }
           });
         });
 
         const days = Object.keys(byDay).map(function (dayKey) {
           const entry = byDay[dayKey];
-          const attributes = { created_at: entry.date };
+          const attributes = { time_of_observation: entry.date };
           METRIC_CATALOG.forEach(function (m) {
             const s = entry.sums[m.observationField];
             attributes[m.observationField] = s ? s.total / s.count : null;
+            attributes[m.observationField + "_atLimit"] = !!(entry.atLimit && entry.atLimit[m.observationField]);
           });
           return { attributes: attributes };
         });
 
-        days.sort(function (a, b) { return a.attributes.created_at - b.attributes.created_at; });
+        days.sort(function (a, b) { return a.attributes.time_of_observation - b.attributes.time_of_observation; });
         return days;
       }
 
@@ -5531,6 +5956,7 @@
         const emptyEl = document.getElementById("chartEmpty");
         const titleEl = document.getElementById("chartTitle");
         const legendEl = document.getElementById("chartLegend");
+        const limitNoteEl = document.getElementById("chartLimitNote");
         const wrapEl = document.querySelector("#trendChartRoot .chartWrap");
 
         const metric = METRIC_CATALOG.find(function (m) { return m.key === selectedMetricKey; }) || METRIC_CATALOG[0];
@@ -5538,17 +5964,24 @@
 
         svg.innerHTML = "";
         tooltip.hidden = true;
+        limitNoteEl.hidden = true;
 
         const series = selectedSites.map(function (s, i) {
           const cached = siteDataCache[s.locationID];
           const daily = cached ? cached.dailyObservations : [];
           const points = daily
-            .map(function (f) { return { date: f.attributes.created_at, value: f.attributes[metric.observationField] }; })
+            .map(function (f) {
+              return {
+                date: f.attributes.time_of_observation,
+                value: f.attributes[metric.observationField],
+                atLimit: !!f.attributes[metric.observationField + "_atLimit"]
+              };
+            })
             .filter(function (p) { return p.date !== null && p.date !== undefined && p.value !== null && p.value !== undefined; })
             .filter(function (p) { return isWithinDateRange(p.date); });
 
           return {
-            siteName: s.attrs.locationName || "(unnamed location)",
+            siteName: s.attrs.location_name || "(unnamed location)",
             // Comparing two sites: each site gets its own fixed color (see
             // compareColor/COMPARE_SITE_COLORS) so the two lines read as
             // "two different places" at a glance, not "two lines that
@@ -5641,6 +6074,15 @@
         const colBaseline = rootStyle.getPropertyValue("--baseline").trim();
         const colSurface = rootStyle.getPropertyValue("--surface-1").trim();
         const colText = rootStyle.getPropertyValue("--text-primary").trim();
+        // Faint red ring drawn around any point flagged `atLimit` (its
+        // reading was at or beyond the equipment's detection range) - a
+        // fixed color rather than a theme variable so it reads as a
+        // consistent "watch out" signal on both the light and dark
+        // surface. Semi-transparent so it stays a subtle ring rather than
+        // competing with the metric's own dot color underneath.
+        const colLimitFlag = "rgba(214, 45, 38, 0.55)";
+        const anyLimitFlagged = series.some(function (s) { return s.points.some(function (p) { return p.atLimit; }); });
+        limitNoteEl.hidden = !anyLimitFlagged;
 
         function addEl(tag, attrs) {
           const el = document.createElementNS(svgNS, tag);
@@ -5706,9 +6148,20 @@
 
             s.points.forEach(function (p, i) {
               const isLast = i === s.points.length - 1;
+              const r = isLast ? 4 : 3;
+              // A reading at/beyond the equipment's detection limit gets a
+              // faint red ring drawn around its dot, in addition to (not
+              // instead of) the dot's own metric color - see METRIC_CATALOG's
+              // equipmentLimitField and the note under the chart.
+              if (p.atLimit) {
+                addEl("circle", {
+                  cx: xScale(p.date), cy: yScale(p.value),
+                  r: r + 3, fill: "none", stroke: colLimitFlag, "stroke-width": 2
+                });
+              }
               addEl("circle", {
                 cx: xScale(p.date), cy: yScale(p.value),
-                r: isLast ? 4 : 3, fill: s.color, stroke: colSurface, "stroke-width": isLast ? 2 : 1.5
+                r: r, fill: s.color, stroke: colSurface, "stroke-width": isLast ? 2 : 1.5
               });
             });
 
@@ -5740,6 +6193,9 @@
           } else if (s.points.length === 1) {
             const p = s.points[0];
             const cx = xScale(p.date), cy = yScale(p.value);
+            if (p.atLimit) {
+              addEl("circle", { cx: cx, cy: cy, r: 7, fill: "none", stroke: colLimitFlag, "stroke-width": 2 });
+            }
             addEl("circle", { cx: cx, cy: cy, r: 4, fill: s.color, stroke: colSurface, "stroke-width": 2 });
             if (!comparing) {
               addEl("text", {
@@ -5812,12 +6268,18 @@
             }
             const valueEl = document.createElement("div");
             valueEl.className = "ttValue";
-            valueEl.textContent = formatTickValue(p.value);
+            valueEl.textContent = formatTickValue(p.value) + (p.atLimit ? " *" : "");
             const dateEl = document.createElement("div");
             dateEl.className = "ttDate";
             dateEl.textContent = formatDateLong(p.date);
             row.appendChild(valueEl);
             row.appendChild(dateEl);
+            if (p.atLimit) {
+              const limitEl = document.createElement("div");
+              limitEl.className = "ttLimit";
+              limitEl.textContent = "At/beyond equipment detection limit";
+              row.appendChild(limitEl);
+            }
             tooltip.appendChild(row);
             anyShown = true;
           });
@@ -5943,7 +6405,7 @@
 
       // Restores the saved light/dark choice (defaulting to dark), which
       // also populates the metric list and symbology for the first time
-      // (all six metrics, nothing to narrow by yet, so it's ready the
+      // (all seven metrics, nothing to narrow by yet, so it's ready the
       // instant an org is picked) - placed last so every value it touches
       // (leagueRows, etc.) is already initialized.
       initTheme();
@@ -5967,6 +6429,7 @@
       <div id="tabBar">
         <button type="button" class="tabButton active" data-tab="map" title="View the map and select an organisation or site">Map</button>
         <button type="button" class="tabButton" data-tab="league" title="Compare every site's water quality metrics in a sortable table">Site league table</button>
+        <button type="button" class="tabButton" data-tab="org" title="See details about the currently selected organisation">Organisation details</button>
       </div>
     </div>
 
@@ -6094,6 +6557,7 @@
               <svg id="trendChartSvg"></svg>
               <div class="chartTooltip" id="chartTooltip" hidden></div>
             </div>
+            <div class="chartLimitNote" id="chartLimitNote" hidden><span class="swatch"></span>* reading at the equipment's detection limit</div>
             <div class="chartEmpty" id="chartEmpty" hidden></div>
           </div>
         </div>
@@ -6134,6 +6598,10 @@
             <div class="statBox">
               <div class="value" id="statConductivity"></div>
               <div class="label">Avg Conductivity (uS/cm)</div>
+            </div>
+            <div class="statBox">
+              <div class="value" id="statTemperature"></div>
+              <div class="label">Avg Temperature (&deg;C)</div>
             </div>
           </div>
 
@@ -6176,6 +6644,18 @@
             <tbody id="leagueTableBody"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <div id="orgArea">
+      <div class="leagueHeader">
+        <h2>Organisation details</h2>
+        <div class="leagueOrgName" id="orgDetailsSubtitle"></div>
+      </div>
+      <div id="orgDetailsEmpty">Select an organisation from the sidebar to see its details.</div>
+      <div id="orgDetailsContent" style="display: none;">
+        <h3>Equipment in use</h3>
+        <div class="equipCardGrid" id="equipCardGrid"></div>
       </div>
     </div>
 
