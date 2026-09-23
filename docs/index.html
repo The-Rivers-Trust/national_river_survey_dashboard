@@ -65,6 +65,13 @@
       --gridline:       #333330;
       --baseline:       #4c4b46;
       --accent:         #3987e5;
+      /* Elevation shadow for the five structural "card" panels (top bar,
+         left/right panels, map, chart) - see .dashboardCard and #viewDiv
+         further down. A page background this dark needs a visibly
+         stronger shadow than the light theme's own pairing below to read
+         as elevated at all - a shadow subtle enough to look right against
+         a near-white surface just disappears against near-black. */
+      --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
       /* Storm overflow popup status colours - one fg/bg pair per category,
          shared between the popup's date badge fill, headline text and
          "ACTIVE" pill (see .stormPopupCard--* further down) and
@@ -105,6 +112,10 @@
       --gridline:       #ddd9d0;
       --baseline:       #bebab0;
       --accent:         #1c67c2;
+      /* Light-theme pairing for --card-shadow above - noticeably lighter
+         than the dark theme's own value, since the same shadow strength
+         would look muddy/heavy against a near-white surface. */
+      --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
       /* Light-theme pairing for the storm overflow popup status colours -
          see the :root block above for why these exist and how they're
          used. Solid pale washes rather than the dark theme's translucent
@@ -134,10 +145,17 @@
     /* body is now a column: the full-width #topBar (selections/filters)
        stacked above #appContainer (sidebar/map/details), rather than
        #appContainer alone filling the whole viewport - see #topBar below
-       for why these moved out of the sidebar. */
+       for why these moved out of the sidebar. A page-level padding plus a
+       matching gap between every top-level panel is what turns the old
+       edge-to-edge layout into separated "cards" (see .dashboardCard
+       below) - both need to move together if this spacing is ever
+       revisited. */
     body {
       display: flex;
       flex-direction: column;
+      padding: 12px;
+      box-sizing: border-box;
+      gap: 12px;
     }
 
     #appContainer {
@@ -145,6 +163,23 @@
       flex: 1 1 auto;
       min-height: 0;
       width: 100%;
+      gap: 12px;
+    }
+
+    /* --- Shared "card" look for the 5 structural panels (top bar,
+       sidebar, map, details panel, chart) - rounded corners plus a
+       theme-aware elevation shadow (--card-shadow, defined per-theme
+       above). Applied via class since it's purely cosmetic and shared
+       across otherwise-unrelated elements; each element's own #id rule
+       still owns its layout (width/flex/padding/etc) and now a full
+       all-around border (replacing the old single-side borders that
+       only made sense in the previous edge-to-edge layout).
+       #viewDiv (the map) deliberately does NOT get this class - see the
+       comment on #viewDiv itself for why it needs a self-contained
+       border-free treatment instead. */
+    .dashboardCard {
+      border-radius: 12px;
+      box-shadow: var(--card-shadow);
     }
 
     /* --- Top bar: every selection/filter that isn't specific to the
@@ -172,7 +207,7 @@
       gap: 20px;
       padding: 10px 16px;
       background: var(--surface-1);
-      border-bottom: 1px solid var(--border);
+      border: 1px solid var(--border);
       box-sizing: border-box;
     }
 
@@ -233,14 +268,17 @@
        regardless of how wide the title text happens to render: 320
        (#sidebar's own border-box width) minus 16 (#topBar's left
        padding, which #sidebar's left padding matches) minus 20 (the
-       gap #topBar puts before the next group) = 284, landing the View
-       group's left edge flush with #mapColumn/#viewDiv's left edge
-       below. Overridden back to auto in the narrow-layout media query,
-       where groups stack full-width instead of sitting side by side. */
+       gap #topBar puts before the next group) plus 12 (the gap
+       #appContainer now puts between #sidebar and #mapArea, which
+       shifts #mapColumn's left edge right by that much - see
+       #appContainer above) = 296, landing the View group's left edge
+       flush with #mapColumn/#viewDiv's left edge below. Overridden
+       back to auto in the narrow-layout media query, where groups
+       stack full-width instead of sitting side by side. */
     .topBarTitle {
       align-items: flex-start;
       gap: 12px;
-      width: 284px;
+      width: 296px;
       box-sizing: border-box;
     }
 
@@ -602,7 +640,7 @@
       flex-shrink: 0;
       padding: 16px;
       background: var(--surface-1);
-      border-right: 1px solid var(--border);
+      border: 1px solid var(--border);
       box-sizing: border-box;
       overflow-y: auto;
       display: flex;
@@ -641,19 +679,37 @@
     }
 
     /* Imagery basemap button - added to the map itself via view.ui.add
-       (top-right), not this stylesheet's markup, so it's just sized here;
-       everything else (box, border, hover, dark/light theming) comes free
-       from the esri-widget--button/esri-widget classes set on it in the
-       script, same as the built-in zoom buttons. */
+       (top-right), not this stylesheet's markup (see the script). Esri's
+       own esri-widget/esri-interactive classes stay on the element for
+       their built-in hover/focus/keyboard behaviour, but fully re-skinned
+       here (background/border !important to beat Esri's own, more
+       specific rules for them - same reason .active already needed it
+       below) into a small round pill matching this dashboard's other
+       controls (.themeToggleBtn/.whatsNewBtn) rather than Esri's square
+       widget-button look, so it reads as part of the app instead of a
+       bolted-on map-library control. */
     .imageryToggleBtn {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
+      width: 34px;
+      height: 34px;
+      box-sizing: border-box;
+      font-size: 15px;
+      background: var(--surface-2) !important;
+      border: 1px solid var(--border-strong) !important;
+      border-radius: 50%;
+      box-shadow: var(--card-shadow);
+      transition: border-color 0.15s ease;
+    }
+
+    .imageryToggleBtn:hover {
+      border-color: var(--accent) !important;
     }
 
     .imageryToggleBtn.active {
-      background-color: var(--accent) !important;
+      background: var(--accent) !important;
+      border-color: var(--accent) !important;
     }
 
     /* Deselect-waterbody button, bottom-right of the Scorecards map (see
@@ -744,7 +800,7 @@
     }
 
     /* Floating card added to the map view itself via view.ui.add(...,
-       "bottom-left") - Esri handles the actual corner placement, no
+       "top-left") - Esri handles the actual corner placement, no
        manual positioning needed. Same surface/border/shadow language as
        .stormPopup, since it's the same idea (a small floating
        info/control card over the map), just permanently visible rather
@@ -771,6 +827,75 @@
       font-weight: bold;
       font-size: 13px;
       color: var(--text-secondary);
+    }
+
+    /* Holds the "Determinand" label and the minimise toggle side by side -
+       .mapMetricPickerHeader label overrides the block/margin rule above
+       (two classes + element beats one class + element, so this one
+       actually wins rather than silently losing the way an earlier pass
+       elsewhere in this file got bitten by the same kind of specificity
+       mismatch - see the Data guide band header CSS comment). The label
+       itself still carries the margin-bottom that used to separate it
+       from the list below; the header row just needs it to sit inline
+       with the button instead of as a block. */
+    .mapMetricPickerHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .mapMetricPickerHeader label {
+      margin: 0;
+      /* Collapsed, this can hold the selected metric's own name instead of
+         the plain "Determinand" (see updateMetricListLabel) - "Orthophosphate"
+         is long enough that it needs to shrink/truncate here rather than
+         push the toggle button out or wrap, especially at the narrower
+         mobile card width below. */
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Minimise/restore toggle - a plain chevron that rotates rather than
+       swapping glyphs, so there's only ever one icon to keep track of.
+       Pointing down (expanded, the default) or rotated to point sideways
+       (collapsed - see .mapMetricPicker.collapsed below). */
+    .mapMetricPickerToggle {
+      appearance: none;
+      border: none;
+      background: none;
+      padding: 2px;
+      margin: 0 0 6px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: transform 0.15s ease;
+    }
+
+    .mapMetricPickerToggle:hover {
+      color: var(--accent);
+    }
+
+    /* Collapsed state - just hides the list/empty-state below the header
+       (both are #metricList's own content, so hiding that one element
+       covers either) and rotates the chevron to point sideways rather
+       than down, matching a normal disclosure-triangle convention.
+       Nothing needs doing to .mapMetricPicker itself: with the list gone,
+       the card naturally shrinks to just its header's height. */
+    .mapMetricPicker.collapsed .metricList {
+      display: none;
+    }
+
+    .mapMetricPicker.collapsed .mapMetricPickerToggle {
+      transform: rotate(-90deg);
     }
 
     /* --- Date range: narrows both the trend chart and the Recent surveys
@@ -1257,50 +1382,11 @@
       display: none;
     }
 
-    /* --- First-run guidance: the two ways to get started (the org
-       dropdown, or clicking a shaded area on the map) are the only things
-       that actually do anything until an organisation is picked, so this
-       calls both out explicitly rather than leaving a new visitor to
-       stumble onto them. Dismissible, and disappears on its own once an
-       organisation is selected either way. A full-width strip below
-       #topBar (a plain body child, not nested in the old 320px sidebar
-       column it used to sit in), so no rounded corners/side margins of
-       its own - just a bottom border matching #topBar's, and side
-       padding matching #topBar's own 16px so the text lines up with it. --- */
-    .onboardingBanner {
-      position: relative;
-      background: rgba(57, 135, 229, 0.12);
-      border: none;
-      border-bottom: 1px solid rgba(57, 135, 229, 0.35);
-      padding: 8px 26px 8px 16px;
-      margin: 0;
-      box-sizing: border-box;
-    }
-
-    .onboardingBanner p {
-      margin: 0;
-      font-size: 12px;
-      line-height: 1.45;
-      color: var(--text-secondary);
-    }
-
-    .onboardingDismiss {
-      position: absolute;
-      top: 2px;
-      right: 4px;
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: 16px;
-      line-height: 1;
-      cursor: pointer;
-      padding: 6px;
-    }
-
-    .onboardingDismiss:hover {
-      color: var(--text-primary);
-    }
-
+    /* --- First-run guidance: a pulsing glow on the org dropdown, the one
+       thing that actually does anything until an organisation is picked -
+       a new visitor's eye goes there first rather than having to stumble
+       onto it. Stops on its own once an organisation is selected (see
+       dismissOnboarding()). ---  */
     @keyframes onboardingPulse {
       0%, 100% { box-shadow: 0 0 0 0 rgba(57, 135, 229, 0.5); }
       50% { box-shadow: 0 0 0 5px rgba(57, 135, 229, 0); }
@@ -1317,6 +1403,7 @@
       flex-direction: row;
       flex-grow: 1;
       min-width: 0;
+      gap: 12px;
     }
 
     /* The map + chart panel, stacked - only this column's width is spanned
@@ -1326,12 +1413,15 @@
       flex-direction: column;
       flex-grow: 1;
       min-width: 0;
+      gap: 12px;
       /* Anchors #stormPopup (a plain sibling of #viewDiv, not injected
          inside Esri's own view container) - view.toScreen() returns
          coordinates relative to the view container's top-left, which
          coincides with #mapColumn's own top-left since #viewDiv is its
          first child with no padding/border between them, so those
-         coordinates can be used as #stormPopup's left/top directly. */
+         coordinates can be used as #stormPopup's left/top directly. The
+         gap above only adds space AFTER #viewDiv (before #chartPanel),
+         so it doesn't disturb this. */
       position: relative;
       /* Clicking/dragging on the map (panning, clicking a feature) is a
          mousedown+mouseup over empty space from the browser's point of
@@ -1343,9 +1433,20 @@
       -moz-user-select: none;
     }
 
+    /* #viewDiv intentionally does NOT use .dashboardCard/border like its
+       sibling panels - #stormPopup (see #mapColumn above) relies on
+       #viewDiv having no real border or padding, which would shift its
+       content box relative to #mapColumn's top-left and throw off that
+       pixel-perfect positioning. The same rounded/elevated look is
+       reached here without either: overflow:hidden clips the map itself
+       to the rounded corners, and a 1px inset "border" is faked as part
+       of the box-shadow instead of a real border. */
     #viewDiv {
       flex-grow: 1;
       min-height: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 0 1px var(--border), var(--card-shadow);
       /* Fallback while basemap tiles load, so it's dark from the first
          paint rather than flashing white. */
       background: var(--surface-1);
@@ -1377,7 +1478,7 @@
       flex-shrink: 0;
       padding: 16px;
       background: var(--surface-1);
-      border-left: 1px solid var(--border);
+      border: 1px solid var(--border);
       box-sizing: border-box;
       overflow-y: auto;
       color: var(--text-primary);
@@ -1787,7 +1888,7 @@
       box-sizing: border-box;
       padding: 12px 20px;
       background: var(--surface-1);
-      border-top: 1px solid var(--border);
+      border: 1px solid var(--border);
       overflow: hidden;
     }
 
@@ -2530,7 +2631,7 @@
         gap: 10px;
       }
 
-      /* .topBarTitle's fixed 284px (see the main stylesheet) is only for
+      /* .topBarTitle's fixed 296px (see the main stylesheet) is only for
          lining it up with the map when groups sit side by side - here
          they stack full-width instead, so it goes back to sizing itself
          to its own content like every other group. */
@@ -2549,10 +2650,10 @@
         width: 100%;
       }
 
+      /* Border is now uniform all-around (.dashboardCard) regardless of
+         orientation, so nothing needs toggling here beyond width/scroll. */
       #sidebar {
         width: 100%;
-        border-right: none;
-        border-bottom: 1px solid var(--border);
         overflow-y: visible;
       }
 
@@ -2572,6 +2673,33 @@
         height: 42vh;
       }
 
+      /* Determinand picker (.mapMetricPicker/#mapMetricPicker) - a fixed
+         220px was sized for a full desktop map; here the map itself is
+         only 42vh tall (above), so the same card would cover a much
+         bigger share of it. Narrower, shorter, and each row a bit more
+         compact so it still reads as a small overlay rather than
+         crowding out the map underneath it. */
+      .mapMetricPicker {
+        width: 168px;
+        max-height: 45vh;
+        padding: 8px 10px 10px;
+      }
+
+      .mapMetricPicker label {
+        font-size: 12px;
+      }
+
+      .mapMetricPicker .metricItem {
+        padding: 4px 6px;
+        font-size: 12px;
+        gap: 6px;
+      }
+
+      .mapMetricPicker .metricSwatch {
+        width: 8px;
+        height: 8px;
+      }
+
       #chartPanel {
         flex: 0 0 auto;
         height: 28vh;
@@ -2580,8 +2708,6 @@
 
       #detailsPanel {
         width: 100%;
-        border-left: none;
-        border-top: 1px solid var(--border);
         overflow-y: visible;
       }
 
@@ -5055,6 +5181,13 @@
         zoom: INITIAL_ZOOM
       });
 
+      // Built-in zoom (+/-) control defaults to top-left, which is also
+      // where the determinand picker docks (see #mapMetricPicker further
+      // down) - moved to bottom-right instead so the two don't stack on
+      // top of each other (imageryToggleBtn below takes top-right,
+      // leaving bottom-left the one free corner).
+      view.ui.move("zoom", "bottom-right");
+
       // Added after the view is already up and running, deliberately kept
       // out of the Map's own `layers` list above, and wrapped in its own
       // try/catch - if this custom WebGL layer fails to initialize for any
@@ -5097,17 +5230,21 @@
       });
 
       // --- Imagery basemap toggle, as a button on the map itself (top
-      //     right, an empty corner - zoom sits top-left by default) rather
+      //     right, an empty corner now the zoom control has moved to
+      //     bottom-right - see view.ui.move above) rather
       //     than a sidebar checkbox, matching where a basemap control
       //     usually lives on an ArcGIS map. Built as a plain element with
       //     Esri's own widget-button classes instead of one of the API's
       //     basemap widgets, since those assume toggling between two fixed
       //     basemaps - this one has to cooperate with applyBasemap()'s
       //     other input (the light/dark theme), which a fixed pair can't
-      //     express. Picking up esri-widget--button/esri-widget/
-      //     esri-interactive means it re-themes for free whenever setTheme
-      //     swaps the ArcGIS stylesheet, same as the built-in zoom
-      //     buttons. ---
+      //     express. Keeps esri-widget/esri-interactive for their built-in
+      //     hover/focus/keyboard behaviour, but its actual look
+      //     (background/border/shape) is this dashboard's own .imageryToggleBtn
+      //     rule further up, reading from the same --surface-2/--border-strong/
+      //     --accent tokens as every other themed control here - so it
+      //     still re-themes for free with setTheme, just via those custom
+      //     properties rather than Esri's own stylesheet swap. ---
       const imageryToggleBtn = document.createElement("button");
       imageryToggleBtn.type = "button";
       imageryToggleBtn.className = "esri-widget--button esri-widget esri-interactive imageryToggleBtn";
@@ -5117,15 +5254,15 @@
       view.ui.add(imageryToggleBtn, "top-right");
 
       // Water quality metric picker (see .mapMetricPicker/#mapMetricPicker
-      // in the markup) - docked bottom-left, clear of the built-in zoom
-      // control (top-left) and the imagery toggle button above (top-
-      // right). Looked up directly here rather than via the
+      // in the markup) - docked top-left (imagery toggle is top-right,
+      // zoom is bottom-right - see view.ui.move above; bottom-left is now
+      // the free corner). Looked up directly here rather than via the
       // mapMetricPickerEl const further down (used for visibility
       // toggling - see updateMetricPanelVisibility), since that's
       // declared after this point in the script. Its own visibility is
       // still managed separately since it means nothing until an
       // organisation is selected.
-      view.ui.add(document.getElementById("mapMetricPicker"), "bottom-left");
+      view.ui.add(document.getElementById("mapMetricPicker"), "top-left");
 
       imageryToggleBtn.addEventListener("click", function () {
         useImageryBasemap = !useImageryBasemap;
@@ -5208,6 +5345,61 @@
       const orgFilter = document.getElementById("orgFilter");
       const metricListEl = document.getElementById("metricList");
       const mapMetricPickerEl = document.getElementById("mapMetricPicker");
+      const metricListLabelEl = document.getElementById("metricListLabel");
+
+      // --- Minimise/restore the determinand picker card itself (see
+      //     .mapMetricPicker.collapsed) - independent of
+      //     updateMetricPanelVisibility's own show/hide of the whole card
+      //     (that one's an inline style.display driven by tab/organisation
+      //     state; this is a CSS class the user controls directly, and the
+      //     two don't interact - a collapsed card just stays collapsed
+      //     whenever it's next shown). Remembered across reloads the same
+      //     way the light/dark theme choice is (see initTheme) - a plain
+      //     localStorage flag, wrapped in try/catch since localStorage can
+      //     throw (private browsing, disabled storage) and a lost
+      //     preference here is only a minor inconvenience, not worth
+      //     failing startup over. ---
+      const mapMetricPickerToggle = document.getElementById("mapMetricPickerToggle");
+      let mapMetricPickerCollapsed = false;
+      try {
+        mapMetricPickerCollapsed = localStorage.getItem("riverDashboardMetricPickerCollapsed") === "1";
+      } catch (e) {}
+
+      function applyMapMetricPickerCollapsed() {
+        mapMetricPickerEl.classList.toggle("collapsed", mapMetricPickerCollapsed);
+        mapMetricPickerToggle.setAttribute("aria-expanded", String(!mapMetricPickerCollapsed));
+        mapMetricPickerToggle.title = mapMetricPickerCollapsed ? "Restore this panel" : "Minimise this panel";
+      }
+      // Deliberately NOT calling updateMetricListLabel() here (see further
+      // down, near renderMetricList) - selectedMetricKey doesn't exist yet
+      // this early in startup, so reading it now (which a restored
+      // collapsed=true from localStorage would require) would throw. The
+      // header label starts as its plain "Determinand" text either way,
+      // and gets corrected to the selected metric's name the moment
+      // renderMetricList first runs later in startup - before the user
+      // ever sees the page, so there's nothing to notice.
+      applyMapMetricPickerCollapsed();
+
+      // Shared by the toggle button below and by selectMetric (further
+      // down) auto-collapsing once a pick is made - both just want to set
+      // the collapsed flag and have everything downstream of it (the CSS
+      // class, the header label, the remembered preference) follow. Safe
+      // to call anywhere past startup - unlike the raw
+      // applyMapMetricPickerCollapsed() call above, this one's never
+      // invoked before selectedMetricKey exists.
+      function setMapMetricPickerCollapsed(collapsed) {
+        mapMetricPickerCollapsed = collapsed;
+        applyMapMetricPickerCollapsed();
+        updateMetricListLabel();
+        try {
+          localStorage.setItem("riverDashboardMetricPickerCollapsed", mapMetricPickerCollapsed ? "1" : "0");
+        } catch (e) {}
+      }
+
+      mapMetricPickerToggle.addEventListener("click", function () {
+        setMapMetricPickerCollapsed(!mapMetricPickerCollapsed);
+      });
+
       const dateRangeLabel = document.getElementById("dateRangeLabel");
       const dateRangeRow = document.getElementById("dateRangeRow");
       const dateRangePresets = document.getElementById("dateRangePresets");
@@ -5998,24 +6190,19 @@
         updateDateRange();
       });
 
-      // --- First-run guidance: a dismissible banner plus a pulsing glow on
-      //     the org dropdown and the map itself, pointing at the two ways
-      //     to actually get started. Goes away the moment either happens -
-      //     the user picks an organisation - or the user dismisses it
-      //     directly, whichever comes first. `dismissed` guards against it
-      //     reappearing if the org selection is later cleared back to "All
+      // --- First-run guidance: a pulsing glow on the org dropdown (see
+      //     .onboardingHighlight), pointing at the one thing that actually
+      //     does anything before an organisation is picked. Stops the
+      //     moment one is - `onboardingDismissed` guards against it
+      //     restarting if the org selection is later cleared back to "All
       //     organisations". ---
       let onboardingDismissed = false;
 
       function dismissOnboarding() {
         if (onboardingDismissed) return;
         onboardingDismissed = true;
-        document.getElementById("onboardingBanner").style.display = "none";
         orgFilter.classList.remove("onboardingHighlight");
-        document.getElementById("viewDiv").classList.remove("onboardingHighlight");
       }
-
-      document.getElementById("onboardingDismiss").addEventListener("click", dismissOnboarding);
 
       // --- The map's point symbology / trend chart metric picker only
       //     means anything once an organisation is selected (there's
@@ -6095,29 +6282,53 @@
           empty.className = "metricEmpty";
           empty.textContent = "No water quality metrics available.";
           metricListEl.appendChild(empty);
-          return;
+        } else {
+          availableMetrics.forEach(function (m) {
+            const item = document.createElement("button");
+            item.type = "button";
+            item.className = "metricItem" + (m.key === selectedMetricKey ? " active" : "");
+            item.setAttribute("role", "option");
+            item.setAttribute("aria-selected", m.key === selectedMetricKey ? "true" : "false");
+
+            const swatch = document.createElement("span");
+            swatch.className = "metricSwatch";
+            swatch.style.background = metricColor(m);
+
+            const label = document.createElement("span");
+            label.textContent = m.label;
+
+            item.appendChild(swatch);
+            item.appendChild(label);
+            item.addEventListener("click", function () { selectMetric(m.key); });
+
+            metricListEl.appendChild(item);
+          });
         }
 
-        availableMetrics.forEach(function (m) {
-          const item = document.createElement("button");
-          item.type = "button";
-          item.className = "metricItem" + (m.key === selectedMetricKey ? " active" : "");
-          item.setAttribute("role", "option");
-          item.setAttribute("aria-selected", m.key === selectedMetricKey ? "true" : "false");
+        // Keeps the card's header label in sync with whatever's actually
+        // selected - see updateMetricListLabel further down for why this
+        // matters (the header is all that's left visible once the card is
+        // minimised).
+        updateMetricListLabel();
+      }
 
-          const swatch = document.createElement("span");
-          swatch.className = "metricSwatch";
-          swatch.style.background = metricColor(m);
-
-          const label = document.createElement("span");
-          label.textContent = m.label;
-
-          item.appendChild(swatch);
-          item.appendChild(label);
-          item.addEventListener("click", function () { selectMetric(m.key); });
-
-          metricListEl.appendChild(item);
-        });
+      // When expanded, the header just says "Determinand" (the list right
+      // below it already shows the selection). Minimised, the list itself
+      // is hidden (see .mapMetricPicker.collapsed), so the header becomes
+      // the only thing still visible - swapping in the selected metric's
+      // own name (e.g. "Nitrate") there means a glance at the collapsed
+      // card still says what it's showing, rather than just its generic
+      // category label. Called from renderMetricList (selection/available-
+      // metrics changes) and from the toggle's click handler (expand/
+      // collapse) - never from the very first applyMapMetricPickerCollapsed()
+      // call in startup, which runs before selectedMetricKey exists yet.
+      function updateMetricListLabel() {
+        if (!mapMetricPickerCollapsed) {
+          metricListLabelEl.textContent = "Determinand";
+          return;
+        }
+        const metric = METRIC_CATALOG.find(function (m) { return m.key === selectedMetricKey; });
+        metricListLabelEl.textContent = metric ? metric.label : "Determinand";
       }
 
       function selectMetric(key) {
@@ -6128,6 +6339,15 @@
         // A location's chart may already be open - keep it in sync with
         // the newly picked metric rather than waiting for the next click.
         if (selectedSites.length > 0) renderChart();
+        // Auto-minimise the picker once an actual choice is made - picking
+        // a determinand is a one-off action, not something left open like
+        // a running control, so the card doesn't need to keep covering
+        // map space afterwards. Only reachable via an actual click here
+        // (the early return above skips re-picking the same one), never
+        // from updateAvailableMetrics silently reassigning selectedMetricKey
+        // when the available list changes out from under the user - that
+        // calls renderMetricList directly, not this function.
+        setMapMetricPickerCollapsed(true);
       }
 
       // --- Size the location points by whichever metric is selected,
@@ -10527,14 +10747,30 @@
 
         // --- Layout - measured from the panel's actual rendered size
         //     (wide and short along the bottom of the map) rather than the
-        //     old fixed sidebar dimensions, with sane fallbacks in case the
-        //     panel isn't laid out yet (e.g. still display:none). ---
+        //     old fixed sidebar dimensions, with sane fallbacks only for
+        //     when the panel isn't laid out yet (e.g. still display:none,
+        //     so getBoundingClientRect reports 0). Deliberately NOT
+        //     clamped to a minimum otherwise - the svg element itself is
+        //     styled width:100%/height:100% of this same wrap element (see
+        //     .chartWrap svg), so the viewBox has to match that rendered
+        //     box exactly. A viewBox forced wider/taller than the box
+        //     actually is makes the browser's default preserveAspectRatio
+        //     scale the whole drawing down to fit - every line, dot and
+        //     label shrinking uniformly - which is what made the chart
+        //     look "compressed" on a narrower window rather than just
+        //     smaller. Below a few hundred px there's simply less room, so
+        //     it draws smaller/tighter for real, but font sizes stay put
+        //     rather than the whole thing shrinking as one image. ---
         const wrapRect = wrapEl.getBoundingClientRect();
-        const width = Math.max(Math.round(wrapRect.width) || 0, 300);
-        const height = Math.max(Math.round(wrapRect.height) || 0, 120);
+        const width = Math.round(wrapRect.width) || 600;
+        const height = Math.round(wrapRect.height) || 200;
         const marginLeft = 42, marginRight = 16, marginTop = 14, marginBottom = 26;
-        const plotW = width - marginLeft - marginRight;
-        const plotH = height - marginTop - marginBottom;
+        // Floor only applied here (not to width/height themselves above) -
+        // stops the plot area going negative in an extremely narrow panel
+        // without reintroducing the viewBox/box mismatch that caused the
+        // compression in the first place.
+        const plotW = Math.max(width - marginLeft - marginRight, 20);
+        const plotH = Math.max(height - marginTop - marginBottom, 20);
 
         svg.setAttribute("viewBox", "0 0 " + width + " " + height);
 
@@ -11009,7 +11245,7 @@
 </head>
 
 <body>
-  <div id="topBar">
+  <div id="topBar" class="dashboardCard">
     <div class="topBarGroup topBarTitle">
       <div class="titleRow">
       <img class="brandLogo brandLogoDark" src="data:image/png;base64,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" alt="The Rivers Trust" />
@@ -11043,9 +11279,10 @@
           <div class="whatsNewHeader">v1.1 updates</div>
           <ul class="whatsNewList">
             <li><strong>Threshold bandings </strong>(Low / Slightly Elevated / Elevated / High / Very High) for the 7 NRS determinands have been produced &ndash; these threshold bands appear on the map, the charts and in the summary panel. See data guide for more information.</li>
+            <li><strong>Natioanl Soils Map layer added. </strong> Data originates from  Cranfield University, Land Information System LandIS® Portal NationalSoilMap</li>
             <li><strong>Fixed chart axis, based on equipment range</strong> &ndash; the trend chart's y-axis defaults at the widest range the recording equipment can detect (temperature is capped at 40, as river temperature beyond that are unlikely). A "Fit to data" button on the chart switches is also available.</li>
             <li><strong>Cleaner chart gridlines</strong> &ndash; horizontal gridlines removed from the trend chart; the axis value labels are still there for reference.</li>
-            <li><strong>Other UI improvements</strong> &ndash; The Rivers Trust logo added to the top bar, determinand picker is now a separate panel to make more room for the growing contextual layers are, buttons now more aligned and removal of vertical dividers</li>
+            <li><strong>UI improvements</strong> &ndash; The Rivers Trust logo added to the top bar, elements have been given soft rounded borders, determinand picker is now a separate panel on the map to make more room for the growing contextual layers area, horizontal gridlines removed from the trend chart, buttons now more aligned and removal of vertical dividers</li>
           </ul>
         </div>
       </div>
@@ -11097,17 +11334,9 @@
     </div>
   </div>
 
-  <!-- Still references the organisation dropdown/map click, just worded
-       for its new spot above #appContainer rather than "below" it inside
-       the old sidebar - see dismissOnboarding() for what clears this. -->
-  <div id="onboardingBanner" class="onboardingBanner">
-    <button type="button" id="onboardingDismiss" class="onboardingDismiss" aria-label="Dismiss">&times;</button>
-    <p>Get started: choose an organisation from the dropdown above, or click a shaded area on the map.</p>
-  </div>
-
   <div id="appContainer">
 
-    <div id="sidebar">
+    <div id="sidebar" class="dashboardCard">
       <div id="contextualLayersPanel">
         <h3>Contextual Layers</h3>
 
@@ -11171,10 +11400,10 @@
 
     <div id="mapArea">
       <div id="mapColumn">
-        <div id="viewDiv" class="onboardingHighlight" title="Click a shaded area to select that organisation, or click a point to see site details. Ctrl/Cmd-click a second point to compare two sites."></div>
+        <div id="viewDiv" title="Click a shaded area to select that organisation, or click a point to see site details. Ctrl/Cmd-click a second point to compare two sites."></div>
 
         <!-- Water quality metric picker - moved onto the map itself
-             (bottom-left, via view.ui.add) so the sidebar can be given
+             (top-left, via view.ui.add) so the sidebar can be given
              over entirely to the contextual layers panel, which is the
              one expected to keep growing. Its own legend (the size ramp
              for whichever metric is selected) no longer gets a separate
@@ -11182,7 +11411,12 @@
              contextual layers panel's own Legend tab instead, so there's
              one legend list, not two. -->
         <div id="mapMetricPicker" class="mapMetricPicker">
-          <label id="metricListLabel" title="Choose which water quality metric sizes the map's points and appears in the chart below">Determinand</label>
+          <div class="mapMetricPickerHeader">
+            <label id="metricListLabel" title="Choose which water quality metric sizes the map's points and appears in the chart below">Determinand</label>
+            <button type="button" id="mapMetricPickerToggle" class="mapMetricPickerToggle" aria-expanded="true" aria-controls="metricList" title="Minimise this panel">
+              <span aria-hidden="true">&#9662;</span>
+            </button>
+          </div>
           <div id="metricList" class="metricList" role="listbox" aria-label="Water quality metric"></div>
         </div>
 
@@ -11200,7 +11434,7 @@
           <div id="stormPopupContent"></div>
         </div>
 
-        <div id="chartPanel" title="Shows how the selected metric has changed over time - readings from the same day are averaged into one point. Ctrl/Cmd-click a second site on the map to compare it here">
+        <div id="chartPanel" class="dashboardCard" title="Shows how the selected metric has changed over time - readings from the same day are averaged into one point. Ctrl/Cmd-click a second site on the map to compare it here">
           <div id="chartPlaceholder">Click a location on the map to see its water quality trend.</div>
 
           <div class="viz-root" id="trendChartRoot" style="display: none;">
@@ -11219,7 +11453,7 @@
         </div>
       </div>
 
-      <div id="detailsPanel">
+      <div id="detailsPanel" class="dashboardCard">
         <div id="detailsPlaceholder">Click a location on the map to see its details.</div>
 
         <div id="detailsContent" style="display: none;">
