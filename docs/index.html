@@ -188,16 +188,6 @@
       color: var(--text-secondary);
     }
 
-    /* A thin vertical rule between groups - stretches to the row's own
-       height (which varies slightly per group) via align-self rather
-       than a fixed height, and disappears along with its neighbors once
-       #topBar wraps them onto separate lines. */
-    .topBarDivider {
-      align-self: stretch;
-      width: 1px;
-      background: var(--border);
-    }
-
     #topBar #tabBar {
       margin-top: 0;
     }
@@ -234,12 +224,232 @@
 
     /* App title, first item in the top bar. No label sits above it like
        the other groups, so it's given its own class rather than
-       .topBarLabel + control. */
+       .topBarLabel + control. Column, the same as a plain .topBarGroup
+       (logo+text row on top, the What's new button below it, left
+       aligned under the logo) - .titleRow underneath carries the row
+       layout the logo+text themselves need.
+       Given a fixed width (rather than sizing to the logo+text content)
+       so the "View" group right after it always starts at the same x
+       regardless of how wide the title text happens to render: 320
+       (#sidebar's own border-box width) minus 16 (#topBar's left
+       padding, which #sidebar's left padding matches) minus 20 (the
+       gap #topBar puts before the next group) = 284, landing the View
+       group's left edge flush with #mapColumn/#viewDiv's left edge
+       below. Overridden back to auto in the narrow-layout media query,
+       where groups stack full-width instead of sitting side by side. */
+    .topBarTitle {
+      align-items: flex-start;
+      gap: 12px;
+      width: 284px;
+      box-sizing: border-box;
+    }
+
+    .topBarTitle .titleRow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     .topBarTitle h2 {
       margin: 0;
       font-size: 16px;
       white-space: nowrap;
       color: var(--text-primary);
+    }
+
+    /* The Rivers Trust logo. Two PNGs (one for each theme) rather than
+       one recolored via CSS, since the source art is a multi-color
+       gradient icon in the dark build and a plain reversed-white one in
+       the light build, not a simple single-tone swap. Both are the same
+       intrinsic size, so only one needs to lay out - the other is just
+       display:none - and toggling which is which follows the same
+       html[data-theme="light"] switch as every other theme override in
+       this file (see setTheme). */
+    .brandLogo {
+      height: 28px;
+      width: auto;
+      display: block;
+    }
+
+    .brandLogoLight {
+      display: none;
+    }
+
+    html[data-theme="light"] .brandLogoDark {
+      display: none;
+    }
+
+    html[data-theme="light"] .brandLogoLight {
+      display: block;
+    }
+
+    /* What's new button + popover - sits under the logo/title row inside
+       .topBarTitle (see .titleRow above), a small pill button matching
+       .themeToggleBtn's own look/sizing, with a popover styled like
+       .stormPopup (same surface/border/shadow) since it's the same kind
+       of lightweight floating info card, just anchored to a fixed UI
+       button instead of a map point - no arrow needed. */
+    .whatsNewWrap {
+      position: relative;
+    }
+
+    .whatsNewBtn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px 3px 6px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      color: var(--text-secondary);
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .whatsNewBtn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .whatsNewIcon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-style: italic;
+      font-weight: bold;
+      font-family: Georgia, serif;
+    }
+
+    .whatsNewPopover {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      z-index: 1000;
+      width: 320px;
+      max-height: 360px;
+      overflow-y: auto;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+      padding: 14px 16px 12px;
+      color: var(--text-primary);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .whatsNewHeader {
+      font-weight: bold;
+      font-size: 13px;
+      margin: 0 0 8px;
+      padding-right: 20px;
+    }
+
+    .whatsNewList {
+      margin: 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .whatsNewCloseBtn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      appearance: none;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 18px;
+      line-height: 1;
+      padding: 2px;
+    }
+
+    .whatsNewCloseBtn:hover {
+      color: var(--text-primary);
+    }
+
+    /* Row holding both info buttons (Data guide, What's new) side by
+       side under the logo/title - each still gets its own .whatsNewWrap
+       (position: relative) so its popover anchors under itself rather
+       than under the row as a whole. */
+    .titleInfoRow {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Wider than the shared .whatsNewPopover default - a threshold table
+       for seven determinands needs the room, unlike the plain bullet
+       list What's new uses. Capped so it never runs off a narrow
+       window; the table itself scrolls sideways past that point rather
+       than the popover overflowing the viewport. */
+    .dataGuidePopover {
+      width: 620px;
+      max-width: calc(100vw - 32px);
+    }
+
+    .dataGuideIntro {
+      margin: 0 0 10px;
+      color: var(--text-secondary);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .dataGuideTableWrap {
+      overflow-x: auto;
+    }
+
+    .dataGuideTable {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 11px;
+    }
+
+    .dataGuideTable th,
+    .dataGuideTable td {
+      padding: 5px 8px;
+      text-align: left;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .dataGuideTable th {
+      font-weight: bold;
+      color: var(--text-secondary);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .dataGuideMetric {
+      font-weight: bold;
+      color: var(--text-primary);
+    }
+
+    .dataGuideUnit {
+      color: var(--text-muted);
+    }
+
+    /* Small colored square before each band's column header - the same
+       WFD_BAND_STYLE color used to tint that band's own cells below it
+       and everywhere else this app shows these five bands (map rings,
+       stat boxes, chart background bands). */
+    .dataGuideSwatch {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      margin-right: 4px;
     }
 
     /* Invisible stand-in for a .topBarLabel, used only above the theme
@@ -264,13 +474,14 @@
       margin-top: 0;
     }
 
-    /* --- Left sidebar: now just the water quality metric picker (and its
-       legend) and the contextual layers panel - everything else that used
-       to live here moved up into #topBar above. Still a flex column so
-       #contextualLayersPanel can be pinned to the bottom via
-       margin-top: auto, with the metric picker filling the space above
-       it. Same width as the details panel on the right, so the map sits
-       evenly between two matched side panels. --- */
+    /* --- Left sidebar: now given over entirely to the contextual layers
+       panel, which is the one expected to keep growing (more reference
+       layers, more classification pickers). The water quality metric
+       picker that used to share this space moved onto the map itself
+       (see .mapMetricPicker further down) so it never has to compete
+       with contextual layers for room. Same width as the details panel
+       on the right, so the map sits evenly between two matched side
+       panels. --- */
     #sidebar {
       width: 320px;
       flex-shrink: 0;
@@ -417,31 +628,34 @@
       margin-top: 4px;
     }
 
-    /* Mounts the ArcGIS Legend widget - it renders its own chrome inside,
-       themed dark by the esri/themes/dark stylesheet linked in <head>. That
-       stylesheet's dark surface is close to but not exactly our own, so it
-       reads as a faint box against the sidebar - made transparent here at
-       every level of the widget's markup so it shows the sidebar's own
-       background straight through instead of a near-but-not-quite match. */
-    #symbolLegend {
-      margin-top: 10px;
+    /* Floating card added to the map view itself via view.ui.add(...,
+       "bottom-left") - Esri handles the actual corner placement, no
+       manual positioning needed. Same surface/border/shadow language as
+       .stormPopup, since it's the same idea (a small floating
+       info/control card over the map), just permanently visible rather
+       than opened on a click. */
+    .mapMetricPicker {
+      width: 220px;
+      max-width: calc(100vw - 32px);
+      max-height: 320px;
+      overflow-y: auto;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+      padding: 10px 12px 12px;
+      box-sizing: border-box;
     }
 
-    #symbolLegend .esri-legend {
-      max-width: 100%;
-      font-size: 12px;
-    }
-
-    /* #symbolLegend itself, not just its descendants - the API takes over
-       the container element it's given rather than nesting a fresh div
-       inside it, so its own outer chrome (.esri-widget's #242424
-       background, the size-ramp card's box-shadow) lands directly on this
-       ID rather than on a child, and was slipping past the descendant-only
-       rule below as the "faint box" seen behind e.g. the Phosphate ramp. */
-    #symbolLegend,
-    #symbolLegend * {
-      background: transparent !important;
-      box-shadow: none !important;
+    /* Replaces the old "#sidebar label" rule this label used to pick up
+       for free back when it lived in the sidebar - now that it's inside
+       its own floating card instead, it needs its own font/color rule. */
+    .mapMetricPicker label {
+      display: block;
+      margin: 0 0 6px;
+      font-weight: bold;
+      font-size: 13px;
+      color: var(--text-secondary);
     }
 
     /* --- Date range: narrows both the trend chart and the Recent surveys
@@ -1101,20 +1315,10 @@
     }
 
     /* --- Contextual layers panel: houses reference-layer toggles (the WFD
-       catchments layer today, more to follow) separately from the
-       organisation-scoped filters above. margin-top: auto pushes it to the
-       bottom of #sidebar's flex column, so it reads as its own "bottom
-       half" section regardless of how tall the filters above happen to
-       be. On narrow/stacked layouts (see the max-width: 700px media query)
-       #sidebar's height is no longer constrained, so this just falls in
-       naturally after the filters instead of sticking to a bottom edge -
-       a reasonable fallback rather than a broken one. --- */
-    #contextualLayersPanel {
-      margin-top: auto;
-      padding-top: 14px;
-      border-top: 1px solid var(--border);
-    }
-
+       catchments layer today, more to follow) - now the sole occupant of
+       #sidebar (see the comment above #sidebar), so it no longer needs
+       margin-top: auto or a separator to hold its own "bottom half"
+       section under anything else. --- */
     #contextualLayersPanel h3 {
       font-size: 13px;
       margin: 0 0 4px;
@@ -1168,9 +1372,12 @@
       margin: 0;
     }
 
-    /* Same transparent-background treatment as #symbolLegend above, and for
-       the same reason - the Esri Legend widget takes over its container
-       element directly rather than nesting a fresh div inside it. */
+    /* Made transparent at every level for the same reason the map metric
+       picker card gets its own custom styling instead - the Esri Legend
+       widget takes over its container element directly, themed dark by
+       the esri/themes/dark stylesheet linked in <head>, which is close
+       to but not exactly this app's own dark surface and otherwise reads
+       as a faint mismatched box behind each legend entry. */
     #contextualLegend .esri-legend {
       max-width: 100%;
       font-size: 12px;
@@ -1459,11 +1666,41 @@
       flex-direction: column;
     }
 
+    /* Holds .chartTitle side by side with chartFitToDataBtn - the title
+       shrinks/truncates first (flex:1, ellipsis) if the two ever don't
+       fit on one line, since the button's own label needs to stay whole
+       to still read as a button. */
+    .chartTitleRow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      flex-shrink: 0;
+    }
+
     .chartTitle {
       font-size: 13px;
       font-weight: bold;
       color: var(--text-primary);
-      margin-bottom: 6px;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Toggles renderChart's y-axis between the fixed equipment-range
+       domain (default - see EQUIPMENT_RANGE_BY_METRIC) and the old
+       data-driven one that scales to whatever's currently plotted - same
+       subToggleBtn box look as the sidebar's other toggle buttons, just
+       sitting in the chart title row instead of a subControlRow. Disabled
+       (see renderChart) whenever the selected metric has no fixed range
+       to depart from in the first place - it's already fitting to data
+       either way then - but its own on/off state is left alone rather
+       than reset, so switching to a metric that DOES have a range, then
+       back, remembers what it was set to. */
+    .chartFitToDataBtn {
       flex-shrink: 0;
     }
 
@@ -1931,7 +2168,9 @@
     }
 
     /* The colored dot next to a legend label - the band's own color
-       (same palette as PHOSPHATE_WFD_BANDS/SCORECARD_RATING_BANDS). */
+       (SCORECARD_RATING_BANDS' own quality-rating palette, not the map's
+       WFD_BAND_STYLE - see the comment above SCORECARD_RATING_BANDS for
+       why they're kept separate). */
     .scorecardsBandDot {
       display: inline-block;
       width: 9px;
@@ -2139,17 +2378,19 @@
         min-height: 100%;
       }
 
-      /* Each group stacks full-width rather than wrapping mid-row - a
-         lone floating divider between two wrapped lines reads as a stray
-         mark rather than a separator, so they're hidden here instead. */
+      /* Each group stacks full-width rather than wrapping mid-row. */
       #topBar {
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
       }
 
-      .topBarDivider {
-        display: none;
+      /* .topBarTitle's fixed 284px (see the main stylesheet) is only for
+         lining it up with the map when groups sit side by side - here
+         they stack full-width instead, so it goes back to sizing itself
+         to its own content like every other group. */
+      .topBarTitle {
+        width: auto;
       }
 
       #topBar #orgFilter {
@@ -2270,40 +2511,89 @@
       // (see buildLocationsRenderer, further down) - EDIT THRESHOLDS/
       // COLORS HERE, nothing else needs to change to match.
       //
-      // Each site's ring color is driven by its average phosphate reading
-      // (phosphateAverage in leagueRows - see recomputeLeagueRows),
-      // independent of whichever metric is currently picked to size/color
-      // the dot itself, so the ring always means the same thing regardless
-      // of what's selected in the sidebar.
+      // Every metric in METRIC_CATALOG with an entry in
+      // WFD_METRIC_THRESHOLDS below gets banded the same way phosphate
+      // originally was: whichever metric is currently selected in the
+      // sidebar drives BOTH the ring color and the dot size, banded
+      // through that metric's own thresholds - not just phosphate's. The
+      // five band names/colors themselves (WFD_BAND_STYLE) are shared by
+      // every metric, so "Low"/"Very High" always mean the same colors no
+      // matter which parameter you're looking at; only the numeric
+      // thresholds that decide which band a reading falls into differ per
+      // metric (WFD_METRIC_THRESHOLDS). Also drives the same-color tint on
+      // the details panel's stat boxes - see updateStatsForPrimary.
       //
-      // `max` is each band's upper bound in mg/l, exclusive (a value
-      // exactly ON a boundary falls into the band ABOVE it - e.g. exactly
-      // 0.25 is "Good", not "High"); the last band's `max` is null,
-      // meaning no upper bound. Bands must stay listed in ascending
-      // `max` order with the open-ended one last.
+      // Real, agreed thresholds (as of 2026-09-23) for all seven metrics -
+      // phosphate's own thresholds changed too as part of this (its
+      // original values here were an illustrative placeholder, not the
+      // agreed ones).
       //
-      // Colors are taken directly from the WFD Waterbody Classification
-      // layer's own ecological_class renderer (catchmentsLayer below;
-      // confirmed via that service's REST ?f=json drawingInfo.renderer -
-      // services3.arcgis.com/.../WFD_River_Water_Body_Catchments_Cycle_4_With_Coastal),
-      // so a ring color always means the same thing here as it does on
-      // that layer.
-      const PHOSPHATE_WFD_BANDS = [
-        { key: "high", label: "High", max: 0.25, color: "#0072b0" },
-        { key: "good", label: "Good", max: 0.5, color: "#56d5e8" },
-        { key: "moderate", label: "Moderate", max: 0.75, color: "#e6b800" },
-        { key: "poor", label: "Poor", max: 1, color: "#f08c00" },
-        { key: "bad", label: "Bad", max: null, color: "#d63129" }
+      // Each threshold is that band's own upper bound, INCLUSIVE - e.g.
+      // for ammonia, a reading of exactly 0.5 is "Slightly Elevated", not
+      // "Elevated" (the opposite convention from this app's older
+      // placeholder bands, which put a boundary value in the band above -
+      // this file has no other <= vs < band logic left to confuse it
+      // with). The last band ("Very High") is always open-ended above the
+      // 4th threshold. Ammonia and nitrite's "Low" threshold is 0 - since
+      // neither can read below zero, that means only a true zero reading
+      // counts as "Low"; anything detectable at all is at least "Slightly
+      // Elevated". Conductivity's High threshold is corrected here to
+      // 2000 - the figure given (200) breaks the required ascending order
+      // (below Elevated's own 1500) and doesn't fit the pattern of the
+      // other six metrics or the ">2000" given for Very High; flag if that
+      // guess is wrong. Phosphate's thresholds were corrected again later
+      // the same day, to Low <=0.10 / Slightly Elevated <=0.30 / Elevated
+      // <=0.75 / High <=1.00 / Very High >1 - the values just below
+      // superseded an earlier, wrong first pass at the real thresholds.
+      const WFD_BAND_STYLE = [
+        { key: "low", label: "Low", color: "#0072b0" },
+        { key: "slightlyElevated", label: "Slightly Elevated", color: "#56d5e8" },
+        { key: "elevated", label: "Elevated", color: "#e6b800" },
+        { key: "high", label: "High", color: "#f08c00" },
+        { key: "veryHigh", label: "Very High", color: "#d63129" }
       ];
+
+      // metric key -> [lowMax, slightlyElevatedMax, elevatedMax, highMax],
+      // ascending, in each metric's own unit (see METRIC_CATALOG). A
+      // metric with no entry here (there currently are none - all seven
+      // catalog metrics have thresholds) falls back to the plain
+      // single-color/continuous-size look in buildLocationsRenderer.
+      const WFD_METRIC_THRESHOLDS = {
+        ammonia: [0, 0.5, 1, 3], // mg/L
+        conductivity: [500, 1000, 1500, 2000], // uS/cm - see High-threshold correction note above
+        nitrate: [0.5, 2, 5, 20], // mg/L
+        nitrite: [0, 0.15, 0.3, 1.5], // mg/L
+        phosphate: [0.1, 0.3, 0.75, 1], // mg/L - corrected, see note above
+        temperature: [14, 18, 20, 23], // °C
+        turbidity: [12, 25, 50, 100] // NTU
+      };
+
+      // Builds the 5-band {key,label,max,color} array for one metric key -
+      // WFD_BAND_STYLE's shared label/color vocabulary plus that metric's
+      // own thresholds from WFD_METRIC_THRESHOLDS, in the same shape the
+      // old phosphate-only PHOSPHATE_WFD_BANDS constant used to be. Returns
+      // null for a metric with no thresholds defined (see
+      // WFD_METRIC_THRESHOLDS above).
+      function wfdBandsForMetric(metricKey) {
+        const thresholds = WFD_METRIC_THRESHOLDS[metricKey];
+        if (!thresholds) return null;
+        return WFD_BAND_STYLE.map(function (style, i) {
+          return { key: style.key, label: style.label, color: style.color, max: i < thresholds.length ? thresholds[i] : null };
+        });
+      }
 
       // --- Nitrate spoke - POC, combining nitrate AND ammonia readings
       //     into one score rather than picking just one of the two.
-      //     Thresholds below (mg/L, ascending exclusive max - same shape as
-      //     PHOSPHATE_WFD_BANDS) are illustrative placeholders loosely in
-      //     the range real UK freshwater guidance uses for these
-      //     determinands, NOT an official WFD/EA standard - a domain
-      //     expert should sanity-check them before this feeds anything
-      //     beyond a demo. ---
+      //     Thresholds below (mg/L, ascending exclusive max - same shape
+      //     the map's own WFD_METRIC_THRESHOLDS bands use) are illustrative
+      //     placeholders loosely in the range real UK freshwater guidance
+      //     uses for these determinands, NOT an official WFD/EA standard,
+      //     and deliberately kept separate from the map's own real,
+      //     agreed nitrate/ammonia thresholds (WFD_METRIC_THRESHOLDS,
+      //     above) - this Scorecards spoke is still a first-pass POC score
+      //     even though the map's own bands for these two metrics no
+      //     longer are. A domain expert should sanity-check these before
+      //     this feeds anything beyond a demo. ---
       const SCORECARD_NITRATE_MGL_MAX = [5, 10, 20, 30]; // High/Good/Moderate/Poor upper bounds; Bad is open-ended
       const SCORECARD_AMMONIA_MGL_MAX = [0.3, 0.6, 1.1, 2.5]; // same shape, for ammonia
 
@@ -3190,6 +3480,13 @@
       // value). Used only by the trend chart, to flag those points - see
       // groupObservationsByDay and renderChart.
       //
+      // `determinand` is this metric's own spelling on the Equipment table
+      // (BASE_URL + "/3" - see equipmentTable/loadEquipmentSpecs) - not
+      // always the same string as `label` (Water Temperature vs
+      // Temperature) - used to look up every piece of equipment capable of
+      // measuring it, for the trend chart's fixed y-axis range (see
+      // EQUIPMENT_RANGE_BY_METRIC/computeEquipmentRanges).
+      //
       // Colors are the dataviz palette's validated 8-slot categorical
       // order (references/palette.md in the dataviz skill) taken in
       // sequence - slots 1-6 (blue/orange/aqua/yellow/magenta/green) for
@@ -3205,13 +3502,13 @@
       // show, so a red temperature series would make that ring nearly
       // invisible on every one of its own flagged points.
       const METRIC_CATALOG = [
-        { key: "phosphate", label: "Phosphate", locationField: "phosphateAverage", observationField: "phosphate", equipmentLimitField: "phosphate_equipment_limit", colorLight: "#2a78d6", colorDark: "#3987e5", aggregation: "mean", unit: "mg/L" },
-        { key: "nitrate", label: "Nitrate", locationField: "nitrateAverage", observationField: "nitrate", equipmentLimitField: "nitrate_equipment_limit", colorLight: "#eb6834", colorDark: "#d95926", aggregation: "median", unit: "mg/L" },
-        { key: "nitrite", label: "Nitrite", locationField: "nitriteAverage", observationField: "nitrite", equipmentLimitField: "nitrite_equipment_limit", colorLight: "#1baf7a", colorDark: "#199e70", aggregation: "median", unit: "mg/L" },
-        { key: "ammonia", label: "Ammonia", locationField: "ammoniaAverage", observationField: "ammonia", equipmentLimitField: "ammonia_equipment_limit", colorLight: "#eda100", colorDark: "#c98500", aggregation: "median", unit: "mg/L" },
-        { key: "turbidity", label: "Turbidity", locationField: "turbidityAverage", observationField: "turbidity", equipmentLimitField: "turbidity_equipment_limit", colorLight: "#e87ba4", colorDark: "#d55181", aggregation: "mean", unit: "NTU" },
-        { key: "conductivity", label: "Conductivity", locationField: "conductivityAverage", observationField: "conductivity", equipmentLimitField: "conductivity_equipment_limit", colorLight: "#008300", colorDark: "#008300", aggregation: "mean", unit: "uS/cm" },
-        { key: "temperature", label: "Temperature", locationField: "temperatureAverage", observationField: "water_temperature", equipmentLimitField: "water_temperature_equipment_limit", colorLight: "#4a3aa7", colorDark: "#9085e9", aggregation: "mean", unit: "°C" }
+        { key: "phosphate", label: "Phosphate", locationField: "phosphateAverage", observationField: "phosphate", equipmentLimitField: "phosphate_equipment_limit", determinand: "Phosphate", colorLight: "#2a78d6", colorDark: "#3987e5", aggregation: "mean", unit: "mg/L" },
+        { key: "nitrate", label: "Nitrate", locationField: "nitrateAverage", observationField: "nitrate", equipmentLimitField: "nitrate_equipment_limit", determinand: "Nitrate", colorLight: "#eb6834", colorDark: "#d95926", aggregation: "median", unit: "mg/L" },
+        { key: "nitrite", label: "Nitrite", locationField: "nitriteAverage", observationField: "nitrite", equipmentLimitField: "nitrite_equipment_limit", determinand: "Nitrite", colorLight: "#1baf7a", colorDark: "#199e70", aggregation: "median", unit: "mg/L" },
+        { key: "ammonia", label: "Ammonia", locationField: "ammoniaAverage", observationField: "ammonia", equipmentLimitField: "ammonia_equipment_limit", determinand: "Ammonia", colorLight: "#eda100", colorDark: "#c98500", aggregation: "median", unit: "mg/L" },
+        { key: "turbidity", label: "Turbidity", locationField: "turbidityAverage", observationField: "turbidity", equipmentLimitField: "turbidity_equipment_limit", determinand: "Turbidity", colorLight: "#e87ba4", colorDark: "#d55181", aggregation: "mean", unit: "NTU" },
+        { key: "conductivity", label: "Conductivity", locationField: "conductivityAverage", observationField: "conductivity", equipmentLimitField: "conductivity_equipment_limit", determinand: "Conductivity", colorLight: "#008300", colorDark: "#008300", aggregation: "mean", unit: "uS/cm" },
+        { key: "temperature", label: "Temperature", locationField: "temperatureAverage", observationField: "water_temperature", equipmentLimitField: "water_temperature_equipment_limit", determinand: "Water Temperature", colorLight: "#4a3aa7", colorDark: "#9085e9", aggregation: "mean", unit: "°C" }
       ];
 
       // Every wildlife species the app tags in the details panel, and its
@@ -3252,30 +3549,34 @@
       // ================================================================
       // Waterbody scorecard ratings (Scorecards tab) - POC
       // ================================================================
-      // Every "spoke" on a future waterbody scorecard reports one of the
-      // same five bands the map already uses for phosphate
-      // (PHOSPHATE_WFD_BANDS, above) - High/Good/Moderate/Poor/Bad, same
-      // labels and colors - so a scorecard reads the same way no matter
-      // which spoke you're looking at. This block only builds the RATING
-      // LOGIC (a value/count -> a 0-4 band) - nothing here renders a
-      // scorecard yet; that's the next pass. The Scorecards tab built
-      // below just shows the map (WFD waterbodies + the selected
-      // organisation's sites).
+      // Every "spoke" on a future waterbody scorecard reports one of its
+      // own five bands, in a "quality rating" vocabulary (High/Good/
+      // Moderate/Poor/Bad) rather than the map's own reading-severity
+      // vocabulary (WFD_BAND_STYLE's Low/Slightly Elevated/.../Very High,
+      // see further up) - deliberately kept as its OWN palette rather than
+      // reusing WFD_BAND_STYLE directly, since some spokes (wildlife
+      // richness, invertebrates) rate "more is better", where "Very High"
+      // would misleadingly read as bad. Colors are shared with the map's
+      // bands (same blue-to-red meaning: rank 0 best, rank 4 worst) so a
+      // scorecard still visually agrees with the map, just with its own
+      // wording. This block only builds the RATING LOGIC (a value/count
+      // -> a 0-4 band) - nothing here renders a scorecard yet; that's the
+      // next pass. The Scorecards tab built below just shows the map (WFD
+      // waterbodies + the selected organisation's sites).
       //
-      // Rank 0 = High (best) ... rank 4 = Bad (worst) throughout, matching
-      // PHOSPHATE_WFD_BANDS' own order.
-      //
-      // Only the phosphate spoke reuses real, already-agreed thresholds.
-      // The other three are explicitly a first-pass POC (flagged by the
-      // user as "you come up with it") - reasonable, clearly-documented
-      // guesses to unblock the tab/map work, not validated water-quality
-      // standards. Treat the exact numbers as provisional until reviewed.
-
-      // Just the label/color vocabulary from PHOSPHATE_WFD_BANDS, reused
-      // so every spoke's rating shares one palette.
-      const SCORECARD_RATING_BANDS = PHOSPHATE_WFD_BANDS.map(function (band) {
-        return { key: band.key, label: band.label, color: band.color };
-      });
+      // Only the phosphate spoke reuses real, already-agreed thresholds
+      // (WFD_METRIC_THRESHOLDS.phosphate, above). The other three are
+      // explicitly a first-pass POC (flagged by the user as "you come up
+      // with it") - reasonable, clearly-documented guesses to unblock the
+      // tab/map work, not validated water-quality standards. Treat the
+      // exact numbers as provisional until reviewed.
+      const SCORECARD_RATING_BANDS = [
+        { key: "high", label: "High", color: "#0072b0" },
+        { key: "good", label: "Good", color: "#56d5e8" },
+        { key: "moderate", label: "Moderate", color: "#e6b800" },
+        { key: "poor", label: "Poor", color: "#f08c00" },
+        { key: "bad", label: "Bad", color: "#d63129" }
+      ];
 
       // rank -> {key,label,color}. Clamps out-of-range ranks defensively
       // rather than throwing, since every rank* function below already
@@ -3286,15 +3587,19 @@
         return SCORECARD_RATING_BANDS[clamped];
       }
 
-      // --- Phosphate spoke - reuses the map's own PHOSPHATE_WFD_BANDS
-      //     thresholds exactly, nothing new to invent here. ---
+      // --- Phosphate spoke - reuses the map's own agreed phosphate
+      //     thresholds (WFD_METRIC_THRESHOLDS.phosphate) exactly, nothing
+      //     new to invent here. Rank 0 (best/"High") is the map's own
+      //     "Low" reading band, through rank 4 (worst/"Bad") = "Very
+      //     High" - same <= convention as the map (a value exactly on a
+      //     threshold counts toward the lower/better band). ---
       function scorecardPhosphateRank(avgPhosphateMgPerL) {
         if (avgPhosphateMgPerL === null || avgPhosphateMgPerL === undefined || isNaN(avgPhosphateMgPerL)) return null;
-        for (let i = 0; i < PHOSPHATE_WFD_BANDS.length; i++) {
-          const band = PHOSPHATE_WFD_BANDS[i];
-          if (band.max === null || avgPhosphateMgPerL < band.max) return i;
+        const bands = wfdBandsForMetric("phosphate");
+        for (let i = 0; i < bands.length; i++) {
+          if (bands[i].max === null || avgPhosphateMgPerL <= bands[i].max) return i;
         }
-        return PHOSPHATE_WFD_BANDS.length - 1;
+        return bands.length - 1;
       }
 
       // Shared by SCORECARD_NITRATE_MGL_MAX/SCORECARD_AMMONIA_MGL_MAX
@@ -3440,66 +3745,72 @@
         return "Decode($feature.GlobalID, " + cases.join(", ") + ", null)";
       }
 
-      // Shared prefix for the two phosphate-WFD Arcade expressions below
-      // (the renderer's band key, for the ring color/symbol selection, and
-      // the band's numeric rank, for band-based sizing) - same "compute
-      // the shared value once, each consumer decides what to return" idea
-      // as buildStormOverflowCategoryLogic elsewhere in this file. Always
-      // keyed to phosphateAverage specifically, regardless of whichever
-      // metric the caller actually wants rendered - see the comment on
-      // PHOSPHATE_WFD_BANDS at the top of the file for why.
-      function buildPhosphateWfdBandLogic(rows) {
-        return "var value = " + buildArcadeDecodeExpression("phosphateAverage", rows) + ";\n  ";
+      // Shared prefix for the two WFD-band Arcade expressions below (the
+      // renderer's band key, for the ring color/symbol selection, and the
+      // band's numeric rank, for band-based sizing) - same "compute the
+      // shared value once, each consumer decides what to return" idea as
+      // buildStormOverflowCategoryLogic elsewhere in this file. Keyed to
+      // whichever `field` the caller passes (the currently-selected
+      // metric's own locationField - see buildLocationsRenderer), not
+      // hardcoded to one metric, so every metric with thresholds in
+      // WFD_METRIC_THRESHOLDS gets the same banding phosphate originally
+      // had to itself.
+      function buildWfdBandLogic(field, rows) {
+        return "var value = " + buildArcadeDecodeExpression(field, rows) + ";\n  ";
       }
 
-      // The band's own key ("high"/"good"/.../"bad") - used as the
-      // phosphate renderer's valueExpression, matched against each
+      // The band's own key ("low"/"slightlyElevated"/.../"veryHigh") - used
+      // as the renderer's valueExpression, matched against each
       // uniqueValueInfos entry's `value` below to pick that band's ring
       // color. Bands are checked in ascending `max` order and the first
-      // match wins, so a value exactly on a boundary falls into the band
-      // above it; the final band (max: null) is unconditional, catching
-      // everything past the last threshold. A site with no phosphate
-      // reading in range at all returns "none", which isn't one of
-      // PHOSPHATE_WFD_BANDS' own keys - see buildLocationsRenderer's
-      // defaultSymbol for how that's handled.
-      function buildPhosphateWfdBandArcade(rows) {
-        const lines = [buildPhosphateWfdBandLogic(rows) + "if (IsEmpty(value)) { return \"none\"; }"];
-        PHOSPHATE_WFD_BANDS.forEach(function (band) {
+      // match wins, so a value exactly ON a boundary falls into THAT named
+      // band (inclusive - see the comment above WFD_METRIC_THRESHOLDS);
+      // the final band (max: null) is unconditional, catching everything
+      // past the last threshold. A site with no reading for this metric in
+      // range at all returns "none", which isn't one of `bands`' own keys
+      // - see buildLocationsRenderer's defaultSymbol for how that's
+      // handled.
+      function buildWfdBandArcade(field, rows, bands) {
+        const lines = [buildWfdBandLogic(field, rows) + "if (IsEmpty(value)) { return \"none\"; }"];
+        bands.forEach(function (band) {
           lines.push(band.max === null
             ? "return \"" + band.key + "\";"
-            : "if (value < " + band.max + ") { return \"" + band.key + "\"; }");
+            : "if (value <= " + band.max + ") { return \"" + band.key + "\"; }");
         });
         return lines.join("\n  ");
       }
 
-      // The band's zero-based rank in PHOSPHATE_WFD_BANDS (0 = High ... 4
-      // = Bad) - used only as the phosphate SIZE visual variable's driving
-      // value (see buildLocationsRenderer), so a site sizes up through the
-      // exact same bands its ring color already reflects: Bad biggest,
-      // High smallest, regardless of how far into "Bad" territory its
-      // actual reading is. A site with no phosphate reading returns null,
-      // the same "fall back to the base symbol's size" convention
+      // The band's zero-based rank in `bands` (0 = Low ... 4 = Very High) -
+      // used only as the SIZE visual variable's driving value (see
+      // buildLocationsRenderer), so a site sizes up through the exact same
+      // bands its ring color already reflects: Very High biggest, Low
+      // smallest, regardless of how far into "Very High" territory its
+      // actual reading is. A site with no reading for this metric returns
+      // null, the same "fall back to the base symbol's size" convention
       // buildArcadeDecodeExpression's Decode default relies on elsewhere.
-      function buildPhosphateWfdBandRankArcade(rows) {
-        const lines = [buildPhosphateWfdBandLogic(rows) + "if (IsEmpty(value)) { return null; }"];
-        PHOSPHATE_WFD_BANDS.forEach(function (band, index) {
+      function buildWfdBandRankArcade(field, rows, bands) {
+        const lines = [buildWfdBandLogic(field, rows) + "if (IsEmpty(value)) { return null; }"];
+        bands.forEach(function (band, index) {
           lines.push(band.max === null
             ? "return " + index + ";"
-            : "if (value < " + band.max + ") { return " + index + "; }");
+            : "if (value <= " + band.max + ") { return " + index + "; }");
         });
         return lines.join("\n  ");
       }
 
-      // Plain-JS mirror of the branching above, for spots (like the
-      // phosphate stat box) that need to classify one already-known JS
-      // number directly rather than a Feature's attributes through
-      // Arcade. Returns the matching PHOSPHATE_WFD_BANDS entry, or null
-      // when there's nothing to classify.
-      function phosphateWfdBandForValue(value) {
+      // Plain-JS mirror of the branching above, for spots (like the stat
+      // boxes) that need to classify one already-known JS number directly
+      // rather than a Feature's attributes through Arcade. Returns the
+      // matching band entry for `metricKey` (see wfdBandsForMetric), or
+      // null when there's nothing to classify or `metricKey` has no
+      // thresholds.
+      function wfdBandForValue(metricKey, value) {
         if (value === null || value === undefined) return null;
-        for (let i = 0; i < PHOSPHATE_WFD_BANDS.length; i++) {
-          const band = PHOSPHATE_WFD_BANDS[i];
-          if (band.max === null || value < band.max) return band;
+        const bands = wfdBandsForMetric(metricKey);
+        if (!bands) return null;
+        for (let i = 0; i < bands.length; i++) {
+          const band = bands[i];
+          if (band.max === null || value <= band.max) return band;
         }
         return null;
       }
@@ -3525,20 +3836,22 @@
         ]
       };
 
-      // Static legend-swatch sizes for the phosphate bands - purely
-      // cosmetic, so the Legend widget's "Phosphate WFD class" entries
-      // read High (smallest) through Bad (largest) at a glance without
-      // also showing the separate numeric size ramp Esri would otherwise
-      // add for a data-driven size visual variable (see
-      // buildLocationsRenderer's legendOptions: {showLegend: false}).
-      // Interpolated across LOCATION_MARKER_SCALE_STOPS.dot's own
-      // "1:250,000" min/max (a reasonable reference/mid zoom) so the
-      // legend roughly matches what that zoom level actually looks like,
-      // rather than being tuned separately and drifting out of sync.
-      const PHOSPHATE_BAND_LEGEND_SIZES = (function () {
+      // Static legend-swatch sizes for the WFD bands - purely cosmetic, so
+      // the Legend widget's "<Metric> Class" entries read Low (smallest)
+      // through Very High (largest) at a glance without also showing the
+      // separate numeric size ramp Esri would otherwise add for a
+      // data-driven size visual variable (see buildLocationsRenderer's
+      // legendOptions: {showLegend: false}). Interpolated across
+      // LOCATION_MARKER_SCALE_STOPS.dot's own "1:250,000" min/max (a
+      // reasonable reference/mid zoom) so the legend roughly matches what
+      // that zoom level actually looks like, rather than being tuned
+      // separately and drifting out of sync. Just five sizes shared by
+      // every metric's bands - WFD_BAND_STYLE.length is always 5, same
+      // rank 0-4 shape regardless of which metric is selected.
+      const WFD_BAND_LEGEND_SIZES = (function () {
         const ref = LOCATION_MARKER_SCALE_STOPS.dot.find(function (s) { return s.value === 250000; }) || LOCATION_MARKER_SCALE_STOPS.dot[0];
-        const count = PHOSPHATE_WFD_BANDS.length;
-        return PHOSPHATE_WFD_BANDS.map(function (band, i) {
+        const count = WFD_BAND_STYLE.length;
+        return WFD_BAND_STYLE.map(function (band, i) {
           const t = count === 1 ? 0 : i / (count - 1);
           return ref.min + t * (ref.max - ref.min);
         });
@@ -3548,12 +3861,12 @@
       // between `domainMin`/`domainMax`, with the min/max PIXEL sizes
       // themselves scale-dependent (LOCATION_MARKER_SCALE_STOPS.dot) - the
       // shared plumbing behind both a metric's ordinary continuous sizing
-      // and phosphate's discrete band-rank sizing below, so the two only
-      // ever differ in what they're driven by, not how scale is applied.
-      // `hideLegend` suppresses this specific visual variable's own
-      // ramp from the Legend widget (used for phosphate's band-rank
-      // variable - see PHOSPHATE_BAND_LEGEND_SIZES above for why) without
-      // affecting how it actually sizes points on the map.
+      // and a WFD-banded metric's discrete band-rank sizing below, so the
+      // two only ever differ in what they're driven by, not how scale is
+      // applied. `hideLegend` suppresses this specific visual variable's
+      // own ramp from the Legend widget (used for band-rank sizing - see
+      // WFD_BAND_LEGEND_SIZES above for why) without affecting how it
+      // actually sizes points on the map.
       function buildScaleAwareSizeVisualVariable(valueExpression, domainMin, domainMax, hideLegend) {
         const dotSizeStops = LOCATION_MARKER_SCALE_STOPS.dot;
         const visualVariable = {
@@ -3580,25 +3893,25 @@
         };
       }
 
-      // Builds the locations renderer. Phosphate is the one metric with
-      // WFD band styling (see PHOSPHATE_WFD_BANDS at the top of the file):
-      // a unique-value renderer keyed on buildPhosphateWfdBandArcade, with
-      // each band's own FILL color (rather than the usual single metric
-      // color) AND a size driven by that same band's rank (Bad biggest,
-      // High smallest - buildPhosphateWfdBandRankArcade) rather than by
-      // where its raw reading falls within this org's min/max, so a
-      // site's size means the same thing everywhere, not just relative to
-      // what's currently on screen. "none" (no phosphate reading at all)
-      // falls through to defaultSymbol's ordinary phosphate-blue look.
-      // Every OTHER metric keeps the original plain look: a single fixed
-      // fill color, sized continuously between this org's min/max for
-      // that metric - WFD bands are a phosphate-specific idea, not a
-      // general water-quality one. Both cases share the same plain,
-      // fixed-width outline and stay scale-aware via
-      // LOCATION_MARKER_SCALE_STOPS for the dot itself.
+      // Builds the locations renderer. Every metric with an entry in
+      // WFD_METRIC_THRESHOLDS (all seven in METRIC_CATALOG, currently)
+      // gets WFD band styling: a unique-value renderer keyed on
+      // buildWfdBandArcade, with each band's own FILL color (rather than a
+      // single metric color) AND a size driven by that same band's rank
+      // (Very High biggest, Low smallest - buildWfdBandRankArcade) rather
+      // than by where its raw reading falls within this org's min/max, so
+      // a site's size means the same thing everywhere, not just relative
+      // to what's currently on screen. "none" (no reading for this metric
+      // at all) falls through to defaultSymbol's hollow look. A metric
+      // with no thresholds defined (there currently are none) falls back
+      // to the original plain look instead: a single fixed fill color,
+      // sized continuously between this org's min/max for that metric.
+      // Both cases share the same plain, fixed-width outline and stay
+      // scale-aware via LOCATION_MARKER_SCALE_STOPS for the dot itself.
       function buildLocationsRenderer(field, rows, minVal, maxVal, color) {
         const hasRows = rows && rows.length > 0;
-        const isPhosphate = field === "phosphateAverage";
+        const metric = METRIC_CATALOG.find(function (m) { return m.locationField === field; });
+        const bands = metric ? wfdBandsForMetric(metric.key) : null;
         const hasDataDomain = field && hasRows && minVal !== null && minVal !== undefined && maxVal !== null && maxVal !== undefined && minVal !== maxVal;
 
         function baseSymbol(size, fillColor) {
@@ -3627,35 +3940,36 @@
           };
         }
 
-        if (hasRows && isPhosphate) {
+        if (hasRows && bands) {
           return {
             type: "unique-value",
-            valueExpression: buildPhosphateWfdBandArcade(rows),
-            valueExpressionTitle: "Phosphate Class",
-            uniqueValueInfos: PHOSPHATE_WFD_BANDS.map(function (band, i) {
+            valueExpression: buildWfdBandArcade(field, rows, bands),
+            valueExpressionTitle: metric.label + " Class",
+            uniqueValueInfos: bands.map(function (band, i) {
               return {
                 value: band.key,
                 label: band.label,
-                symbol: baseSymbol(PHOSPHATE_BAND_LEGEND_SIZES[i], band.color)
+                symbol: baseSymbol(WFD_BAND_LEGEND_SIZES[i], band.color)
               };
             }),
             defaultSymbol: noDataSymbol(),
-            defaultLabel: "No phosphate data",
+            defaultLabel: "No " + metric.label.toLowerCase() + " data",
             visualVariables: [
-              buildScaleAwareSizeVisualVariable(buildPhosphateWfdBandRankArcade(rows), 0, PHOSPHATE_WFD_BANDS.length - 1, true)
+              buildScaleAwareSizeVisualVariable(buildWfdBandRankArcade(field, rows, bands), 0, bands.length - 1, true)
             ]
           };
         }
 
-        // Every other metric: no WFD bands to pick a fill from, just one
-        // fixed color - so "no data" is handled with a color visual
-        // variable instead of a unique-value renderer's own
+        // A metric with no WFD bands defined: no bands to pick a fill
+        // from, just one fixed color - so "no data" is handled with a
+        // color visual variable instead of a unique-value renderer's own
         // defaultSymbol (which would also drag in a redundant categorical
         // legend entry alongside the numeric size ramp these metrics
         // already show, the exact duplication phosphate's legend used to
-        // have). The base symbol IS the hollow "no data" look; this
-        // variable fills it in with the metric's real color, but only for
-        // a site that actually has a reading.
+        // have back when it was the only banded metric). The base symbol
+        // IS the hollow "no data" look; this variable fills it in with
+        // the metric's real color, but only for a site that actually has
+        // a reading.
         if (hasRows && field) {
           const resolvedColor = color || MARKER_COLOR;
           const sizeVisualVariable = hasDataDomain
@@ -3781,6 +4095,46 @@
       // (see renderOrgDetails). Empty until loadEquipmentSpecs() resolves.
       let equipmentSpecByGuid = {};
 
+      // metric key -> {min, max} - the widest detection range ANY listed
+      // piece of equipment can report for that metric's determinand
+      // (lowest range_bottom, highest range_top across every Equipment row
+      // for it), used as the trend chart's fixed y-axis (see renderChart) -
+      // deliberately the whole equipment table's range rather than just
+      // whichever specific device measured the readings on screen, so the
+      // axis stays the same no matter which site/organisation is selected.
+      // Empty (falls back to the old data-driven axis - see renderChart)
+      // until computeEquipmentRanges() runs, which loadEquipmentSpecs does
+      // once its query resolves.
+      let EQUIPMENT_RANGE_BY_METRIC = {};
+
+      // Manual overrides on top of the raw equipment-derived max, per
+      // metric key. Temperature's equipment can technically report up to
+      // 80, but a river is never realistically going to be recorded that
+      // hot, so the chart axis is capped at a more useful 40 instead -
+      // this is a deliberate editorial choice, not a data limitation.
+      const EQUIPMENT_RANGE_MAX_OVERRIDE = { temperature: 40 };
+
+      // Rebuilds EQUIPMENT_RANGE_BY_METRIC from the currently-loaded
+      // equipmentSpecByGuid. A metric with no equipment rows at all for
+      // its determinand (shouldn't happen given today's Equipment table,
+      // but defensive) simply gets no entry, so renderChart's fallback
+      // kicks in for it specifically rather than breaking every metric.
+      function computeEquipmentRanges() {
+        const specs = Object.keys(equipmentSpecByGuid).map(function (guid) { return equipmentSpecByGuid[guid]; });
+        EQUIPMENT_RANGE_BY_METRIC = {};
+        METRIC_CATALOG.forEach(function (m) {
+          const matching = specs.filter(function (s) { return s.determinand === m.determinand; });
+          const bottoms = matching.map(function (s) { return s.range_bottom; }).filter(function (v) { return v !== null && v !== undefined; });
+          const tops = matching.map(function (s) { return s.range_top; }).filter(function (v) { return v !== null && v !== undefined; });
+          if (bottoms.length === 0 || tops.length === 0) return;
+          let max = Math.max.apply(null, tops);
+          if (EQUIPMENT_RANGE_MAX_OVERRIDE[m.key] !== undefined) {
+            max = Math.min(max, EQUIPMENT_RANGE_MAX_OVERRIDE[m.key]);
+          }
+          EQUIPMENT_RANGE_BY_METRIC[m.key] = { min: Math.min.apply(null, bottoms), max: max };
+        });
+      }
+
       // The Python loader (load_NRS_data_v2) strips braces and lowercases
       // every GUID it writes onto a location/organisation, but an
       // observation's own `<metric>_equipment_id` is copied straight from
@@ -3797,7 +4151,10 @@
       // GlobalID - see equipmentSpecByGuid above. Re-renders the
       // Organisation details tab once it resolves, so its equipment cards
       // still fill in even if an organisation was already selected before
-      // this finished.
+      // this finished. Also (re)builds EQUIPMENT_RANGE_BY_METRIC and
+      // redraws an already-open trend chart, so its axis switches from
+      // the data-driven fallback to the real fixed range the moment this
+      // resolves, rather than waiting for the next site click.
       function loadEquipmentSpecs() {
         const query = equipmentTable.createQuery();
         query.where = "1=1";
@@ -3810,7 +4167,9 @@
           result.features.forEach(function (f) {
             equipmentSpecByGuid[normalizeGuid(f.attributes.GlobalID)] = f.attributes;
           });
+          computeEquipmentRanges();
           renderOrgDetails();
+          if (selectedSites.length > 0) renderChart();
         }).catch(function (err) {
           console.error("Failed to load equipment specs.", err);
         });
@@ -4427,6 +4786,17 @@
       imageryToggleBtn.innerHTML = '<span aria-hidden="true">\u{1F6F0}\u{FE0F}</span>';
       view.ui.add(imageryToggleBtn, "top-right");
 
+      // Water quality metric picker (see .mapMetricPicker/#mapMetricPicker
+      // in the markup) - docked bottom-left, clear of the built-in zoom
+      // control (top-left) and the imagery toggle button above (top-
+      // right). Looked up directly here rather than via the
+      // mapMetricPickerEl const further down (used for visibility
+      // toggling - see updateMetricPanelVisibility), since that's
+      // declared after this point in the script. Its own visibility is
+      // still managed separately since it means nothing until an
+      // organisation is selected.
+      view.ui.add(document.getElementById("mapMetricPicker"), "bottom-left");
+
       imageryToggleBtn.addEventListener("click", function () {
         useImageryBasemap = !useImageryBasemap;
         applyBasemap();
@@ -4489,17 +4859,16 @@
       // organisation outline layer.
       organisationLayer.legendEnabled = false;
 
-      const legend = new Legend({
-        view: view,
-        container: "symbolLegend",
-        layerInfos: []
-      });
-
-      // Separate Legend widget instance (same view, own container/state)
-      // for the contextual layers panel's "Legend" tab - kept apart from
-      // the water quality metric legend above so switching a reference
-      // layer like catchments on/off never touches what the metric legend
-      // is showing, and vice versa. See updateLegendLayers.
+      // Single Legend widget for the contextual layers panel's "Legend"
+      // tab - the water quality metric's own size-ramp entry (built in
+      // updateLegendLayers, gated on the same visible/org-selected check
+      // updateMetricPanelVisibility uses) sits first in its layerInfos,
+      // followed by one entry per contextual reference layer currently
+      // switched on. Used to be two separate Legend widgets (one just
+      // for the metric, sitting under the old sidebar metric picker) -
+      // folded into one now that the metric picker itself moved onto the
+      // map (see .mapMetricPicker) and its legend has nowhere of its own
+      // to live except here.
       const contextualLegend = new Legend({
         view: view,
         container: "contextualLegend",
@@ -4507,9 +4876,8 @@
       });
 
       const orgFilter = document.getElementById("orgFilter");
-      const metricListLabel = document.getElementById("metricListLabel");
       const metricListEl = document.getElementById("metricList");
-      const symbolLegend = document.getElementById("symbolLegend");
+      const mapMetricPickerEl = document.getElementById("mapMetricPicker");
       const dateRangeLabel = document.getElementById("dateRangeLabel");
       const dateRangeRow = document.getElementById("dateRangeRow");
       const dateRangePresets = document.getElementById("dateRangePresets");
@@ -4834,6 +5202,106 @@
         setTheme(currentTheme === "light" ? "dark" : "light");
       });
 
+      // --- Info popovers under the logo (Data guide, What's new): each
+      //     is a small static info card toggled from its own pill
+      //     button, closing on an outside click, Escape, or its own
+      //     close button - identical behaviour for both, so it's one
+      //     shared setup function rather than two copies of it. ---
+      function setupInfoPopover(btn, popover) {
+        function close() {
+          popover.hidden = true;
+          btn.setAttribute("aria-expanded", "false");
+          document.removeEventListener("click", handleOutsideClick);
+          document.removeEventListener("keydown", handleEscape);
+        }
+
+        function handleOutsideClick(evt) {
+          if (!popover.contains(evt.target) && !btn.contains(evt.target)) {
+            close();
+          }
+        }
+
+        function handleEscape(evt) {
+          if (evt.key === "Escape") close();
+        }
+
+        btn.addEventListener("click", function (evt) {
+          evt.stopPropagation();
+          if (popover.hidden) {
+            // Only one of these floating info cards should be open at a
+            // time - close whichever other one might already be open
+            // before showing this one (see closeAllInfoPopovers below).
+            closeAllInfoPopovers();
+            popover.hidden = false;
+            btn.setAttribute("aria-expanded", "true");
+            document.addEventListener("click", handleOutsideClick);
+            document.addEventListener("keydown", handleEscape);
+          } else {
+            close();
+          }
+        });
+
+        const closeBtn = popover.querySelector(".whatsNewCloseBtn");
+        if (closeBtn) closeBtn.addEventListener("click", close);
+
+        return close;
+      }
+
+      const infoPopoverClosers = [
+        setupInfoPopover(document.getElementById("whatsNewBtn"), document.getElementById("whatsNewPopover")),
+        setupInfoPopover(document.getElementById("dataGuideBtn"), document.getElementById("dataGuidePopover"))
+      ];
+
+      function closeAllInfoPopovers() {
+        infoPopoverClosers.forEach(function (close) { close(); });
+      }
+
+      // Fills in the Data guide popover's table from the same
+      // METRIC_CATALOG/WFD_METRIC_THRESHOLDS/WFD_BAND_STYLE constants the
+      // map, stat boxes and chart bands already read (see the big
+      // comment above WFD_METRIC_THRESHOLDS) - one source of truth, so
+      // this table can never drift out of sync with what the rest of
+      // the app actually shows. Built once at startup since none of
+      // those constants change at runtime.
+      function renderDataGuideTable() {
+        const table = document.getElementById("dataGuideTable");
+        if (!table) return;
+
+        let html = "<thead><tr><th>Determinand</th><th>Unit</th>";
+        WFD_BAND_STYLE.forEach(function (band) {
+          html += '<th><span class="dataGuideSwatch" style="background:' + band.color + '"></span>' + band.label + "</th>";
+        });
+        html += "</tr></thead><tbody>";
+
+        METRIC_CATALOG.forEach(function (m) {
+          const thresholds = WFD_METRIC_THRESHOLDS[m.key];
+          html += '<tr><td class="dataGuideMetric">' + m.label + '</td><td class="dataGuideUnit">' + m.unit + "</td>";
+          if (!thresholds) {
+            html += '<td colspan="' + WFD_BAND_STYLE.length + '">No thresholds defined</td>';
+          } else {
+            WFD_BAND_STYLE.forEach(function (band, i) {
+              const lower = i === 0 ? null : thresholds[i - 1];
+              const upper = i < thresholds.length ? thresholds[i] : null;
+              let text;
+              if (lower === null) {
+                text = "&le; " + formatTickValue(upper);
+              } else if (upper === null) {
+                text = "&gt; " + formatTickValue(lower);
+              } else {
+                text = formatTickValue(lower) + "&ndash;" + formatTickValue(upper);
+              }
+              html += '<td style="background:' + hexToRgba(band.color, 0.16) + '">' + text + "</td>";
+            });
+          }
+          html += "</tr>";
+        });
+
+        html += "</tbody>";
+        table.innerHTML = html;
+      }
+
+      renderDataGuideTable();
+
       // --- Date range: narrows the trend chart and the Recent surveys
       //     carousel down to surveys within [dateRangeFrom, dateRangeTo]
       //     (each a ms timestamp, start/end-of-day so the picked days are
@@ -5060,15 +5528,18 @@
       // --- The map's point symbology / trend chart metric picker only
       //     means anything once an organisation is selected (there's
       //     nothing on the map to symbolize otherwise), and clutters the
-      //     sidebar for a new visitor who hasn't picked one yet - so it's
+      //     map for a new visitor who hasn't picked one yet - so it's
       //     hidden until then. Also respects whichever tab is active,
       //     since it's Map-tab-only regardless of org selection. ---
       let currentTab = "map";
 
       function updateMetricPanelVisibility() {
         const visible = currentTab === "map" && !!orgFilter.value;
-        metricListLabel.style.display = visible ? "block" : "none";
-        metricListEl.style.display = visible ? "flex" : "none";
+        // mapMetricPickerEl wraps both the "Determinand" label and
+        // metricListEl (see the markup) now that they live together in
+        // one floating card over the map, so one display toggle covers
+        // both.
+        mapMetricPickerEl.style.display = visible ? "block" : "none";
         // These three live in #topBar now, not the sidebar - hidden via
         // visibility rather than display so their space stays reserved and
         // #topBar's height never shifts as a tab switches or the
@@ -5080,8 +5551,13 @@
         dateRangeRow.style.visibility = dateRangeVisible ? "visible" : "hidden";
         dateRangePresets.style.visibility = dateRangeVisible ? "visible" : "hidden";
         showAllSitesRow.style.visibility = visible ? "visible" : "hidden";
-        symbolLegend.style.display = visible ? "block" : "none";
         updateDateRangeClearVisibility();
+        // The metric's own legend entry in the contextual layers panel's
+        // Legend tab (see updateLegendLayers) is gated on this same
+        // `visible` check, so it needs recomputing whenever this does -
+        // a tab switch or an organisation being picked/cleared, not just
+        // a metric change.
+        updateLegendLayers();
       }
 
       // --- The metric list: a single selector (styled like a layer list,
@@ -5193,24 +5669,31 @@
         updateLegendLayers();
       }
 
-      // --- Rebuilds both Legend widgets' layer lists from scratch:
-      //     `legend` (in the filters section) gets just the selected
-      //     metric's size ramp, and `contextualLegend` (in the contextual
-      //     layers panel's own Legend tab) gets one entry per contextual
-      //     layer currently switched on - the WFD catchments layer's
-      //     service-provided color-by-ecological-class legend today, more
-      //     to follow as more contextual layers are added. Kept as two
-      //     independent widgets/lists (rather than one shared one) so the
-      //     water quality legend and the contextual layers legend never mix.
-      //     Called from updateSymbology (a metric or org/date-range change)
-      //     and from the catchments checkbox's own change handler, so
-      //     either one changing keeps both lists correct without the two
-      //     having to coordinate. ---
+      // --- Rebuilds contextualLegend's layer list from scratch: the
+      //     selected water quality metric's own size ramp first (only
+      //     while the map metric picker itself would be visible - see
+      //     updateMetricPanelVisibility - since it means nothing before
+      //     an organisation is selected), then one entry per contextual
+      //     reference layer currently switched on - the WFD catchments
+      //     layer's service-provided color-by-ecological-class legend
+      //     today, more to follow as more contextual layers are added.
+      //     One shared list rather than the metric legend's own separate
+      //     widget (which used to sit under the old sidebar metric
+      //     picker) now that the picker itself lives on the map instead
+      //     and its legend has nowhere else to go.
+      //     Called from updateSymbology (a metric or org/date-range
+      //     change), from updateMetricPanelVisibility (a tab switch or
+      //     organisation being picked/cleared), and from the contextual
+      //     layer checkboxes' own change handlers, so any of these
+      //     changing keeps the list correct without having to coordinate
+      //     with each other. ---
       function updateLegendLayers() {
-        const metric = METRIC_CATALOG.find(function (m) { return m.key === selectedMetricKey; });
-        legend.layerInfos = metric ? [{ layer: locationsLayer, title: metric.label }] : [];
-
         const contextualInfos = [];
+
+        const metric = METRIC_CATALOG.find(function (m) { return m.key === selectedMetricKey; });
+        if (metric && currentTab === "map" && !!orgFilter.value) {
+          contextualInfos.push({ layer: locationsLayer, title: metric.label });
+        }
         if (catchmentsLayer.visible) {
           contextualInfos.push({ layer: catchmentsLayer, title: catchmentsLayer.title });
         }
@@ -7860,9 +8343,10 @@
         tabButtons.forEach(function (btn) {
           btn.classList.toggle("active", btn.dataset.tab === tab);
         });
-        // The sidebar (metric picker + contextual layers) only means
-        // anything on the map - hidden on the other tabs so they get the
-        // full width, same idea as mapArea below.
+        // The sidebar (contextual layers) only means anything on the map
+        // - hidden on the other tabs so they get the full width, same
+        // idea as mapArea below (which the map metric picker moves with,
+        // being part of the map view itself now).
         sidebarEl.style.display = tab === "map" ? "flex" : "none";
         mapArea.style.display = tab === "map" ? "flex" : "none";
         leagueArea.style.display = tab === "league" ? "block" : "none";
@@ -8520,16 +9004,17 @@
           const value = row ? row[m.locationField] : null;
           if (collected) el.innerText = formatNumber(value);
 
-          // The phosphate stat box additionally tints itself to match
-          // whichever WFD band (see PHOSPHATE_WFD_BANDS at the top of the
-          // file) this site's average phosphate reading falls into - the
-          // same colors as the map's phosphate rings, so the number and
-          // the map reinforce each other rather than needing a separate
-          // key. Cleared back to the plain statBox look when there's
-          // nothing to classify (site not collecting phosphate, or no
-          // reading in the current date range).
-          if (m.key === "phosphate" && box) {
-            const band = collected ? phosphateWfdBandForValue(value) : null;
+          // Every stat box tints itself to match whichever WFD band (see
+          // WFD_METRIC_THRESHOLDS at the top of the file) this site's
+          // reading for that metric falls into - the same colors as that
+          // metric's map rings when it's the one selected, so the number
+          // and the map reinforce each other rather than needing a
+          // separate key. Cleared back to the plain statBox look when
+          // there's nothing to classify (site not collecting this metric,
+          // no reading in the current date range, or the metric has no
+          // thresholds defined).
+          if (box) {
+            const band = collected ? wfdBandForValue(m.key, value) : null;
             box.style.background = band ? hexToRgba(band.color, 0.22) : "";
             el.style.color = band ? band.color : "";
           }
@@ -9030,6 +9515,18 @@
       let siteDataCache = {};
       let recentObservations = [];
       let surveyIndex = 0;
+
+      // "Fit to data" button's own on/off state (see chartFitToDataBtn and
+      // renderChart's y-axis) - true overrides the trend chart's normal
+      // fixed equipment-range axis back to the old data-driven one.
+      // Deliberately a standalone global rather than reset whenever the
+      // metric/site/date-range changes, so it behaves like a real
+      // "toggle", not a one-shot action that quietly reverts itself.
+      let chartFitToData = false;
+      document.getElementById("chartFitToDataBtn").addEventListener("click", function () {
+        chartFitToData = !chartFitToData;
+        if (selectedSites.length > 0) renderChart();
+      });
 
       // Every weather checkbox is its own "Yes"/null field on the
       // observations table (see loadObservations) - any number can be set
@@ -9555,7 +10052,44 @@
         const allValues = allPoints.map(function (p) { return p.value; });
         const xMin = Math.min.apply(null, allDates);
         const xMax = Math.max.apply(null, allDates);
-        const yTicks = niceTicks(Math.min.apply(null, allValues), Math.max.apply(null, allValues), 4);
+        // Y-axis is fixed to this metric's equipment detection range
+        // (EQUIPMENT_RANGE_BY_METRIC - the lowest range_bottom/highest
+        // range_top across every Equipment row for it, see
+        // computeEquipmentRanges) rather than the data's own min/max, so
+        // the axis stays put across every site/date-range/comparison
+        // instead of rescaling to whatever happens to be on screen - the
+        // WFD threshold bands above line up the same way every time as a
+        // result too. Uses evenlySpacedTicks, NOT niceTicks, for the fixed
+        // case - niceTicks deliberately rounds its domain OUTWARD to a
+        // round number (e.g. turbidity's real 12-240 range would become
+        // 0-400), which is exactly what a fixed, physically-meaningful
+        // range like an equipment's own detection limits shouldn't do;
+        // evenlySpacedTicks keeps min/max exactly as given and just picks
+        // evenly-spaced gridlines between them. `chartFitToData` (the
+        // chart's own "Fit to data" button - see its click handler further
+        // down) overrides this back to the old data-driven niceTicks
+        // domain on demand, same as when a metric has no equipment range
+        // at all (still loading, or none on record). A reading that's
+        // somehow outside the equipment's own range (shouldn't happen -
+        // it's what physically produced the reading) would plot off the
+        // fixed axis rather than silently stretching it, which is the
+        // deliberate trade-off of a fixed range at all.
+        const equipRange = !chartFitToData && EQUIPMENT_RANGE_BY_METRIC[metric.key];
+        const yTicks = equipRange
+          ? { min: equipRange.min, max: equipRange.max, ticks: evenlySpacedTicks(equipRange.min, equipRange.max, 4) }
+          : niceTicks(Math.min.apply(null, allValues), Math.max.apply(null, allValues), 4);
+
+        // "Fit to data" only means something (there's an actual fixed
+        // range to depart from) when this metric has one - reflected as a
+        // disabled look rather than hiding the button outright, so its
+        // position in the title row stays stable as the selected metric
+        // changes. Doesn't touch `chartFitToData` itself, so toggling it
+        // on for a metric that DOES have a range, then switching to one
+        // that doesn't (and back), remembers the setting either way.
+        const fitToDataBtn = document.getElementById("chartFitToDataBtn");
+        fitToDataBtn.disabled = !EQUIPMENT_RANGE_BY_METRIC[metric.key];
+        fitToDataBtn.classList.toggle("active", chartFitToData);
+        fitToDataBtn.setAttribute("aria-pressed", String(chartFitToData));
 
         function xScale(d) {
           return xMax === xMin ? marginLeft + plotW / 2 : marginLeft + ((d - xMin) / (xMax - xMin)) * plotW;
@@ -9567,7 +10101,6 @@
         }
 
         const svgNS = "http://www.w3.org/2000/svg";
-        const colGrid = chartThemeColors.gridline;
         const colMuted = chartThemeColors.textMuted;
         const colBaseline = chartThemeColors.baseline;
         const colSurface = chartThemeColors.surface1;
@@ -9589,10 +10122,60 @@
           return el;
         }
 
-        // Gridlines + y-axis tick labels (recessive - hairline, one step off surface)
+        // --- WFD threshold-zone background bands (see
+        //     WFD_METRIC_THRESHOLDS at the top of the file) - the same
+        //     five Low/Slightly Elevated/Elevated/High/Very High zones
+        //     that color a site's map ring and stat box now shade this
+        //     chart's plot area too, for any metric this app has
+        //     thresholds for, so a trend line's shape reads against the
+        //     same bands everywhere in the app. Drawn first (before
+        //     gridlines/data), so everything else layers on top of them.
+        //     Each band's slice is clipped to the chart's own y-domain
+        //     (yTicks.min/max) - a metric whose readings never reach
+        //     "Very High" just never shows that band here, rather than
+        //     squeezing all five into whatever range happens to be
+        //     visible. A metric with no thresholds defined (see
+        //     wfdBandsForMetric - none currently) draws no bands at all,
+        //     same plain chart as before. Comparing two sites still only
+        //     has one metric selected at a time, so the bands stay
+        //     unambiguous even then. ---
+        const wfdBands = wfdBandsForMetric(metric.key);
+        if (wfdBands) {
+          wfdBands.forEach(function (band, i) {
+            const bandMin = i === 0 ? -Infinity : wfdBands[i - 1].max;
+            const bandMax = band.max === null ? Infinity : band.max;
+            const clippedMin = Math.max(bandMin, yTicks.min);
+            const clippedMax = Math.min(bandMax, yTicks.max);
+            if (clippedMax <= clippedMin) return; // this band doesn't touch the visible range at all
+
+            const yTop = yScale(clippedMax);
+            const yBottom = yScale(clippedMin);
+            addEl("rect", {
+              x: marginLeft, y: yTop,
+              width: plotW, height: Math.max(yBottom - yTop, 0),
+              fill: hexToRgba(band.color, 0.14)
+            });
+
+            // Label the band only when its visible slice is tall enough to
+            // hold text without looking cramped - a sliver right at the
+            // top/bottom of the domain still gets its color, just no
+            // label. Muted and small so it reads as background context,
+            // not competing with the chart's own data-point labels (which
+            // draw later, so they always end up on top of this if the two
+            // ever collide).
+            if (yBottom - yTop >= 14) {
+              addEl("text", {
+                x: width - marginRight - 3, y: (yTop + yBottom) / 2 + 3,
+                "text-anchor": "end", "font-size": 8, fill: colMuted
+              }).textContent = band.label;
+            }
+          });
+        }
+
+        // Y-axis tick labels (no horizontal gridlines - removed by request,
+        // the tick values alone are enough of a reference)
         yTicks.ticks.forEach(function (t) {
           const y = yScale(t);
-          addEl("line", { x1: marginLeft, x2: width - marginRight, y1: y, y2: y, stroke: colGrid, "stroke-width": 1 });
           addEl("text", { x: marginLeft - 6, y: y + 3, "text-anchor": "end", "font-size": 9, fill: colMuted })
             .textContent = formatTickValue(t);
         });
@@ -9845,6 +10428,22 @@
         });
       }
 
+      // Evenly-spaced tick values across an ALREADY-FIXED [min, max] domain
+      // (divisions + 1 ticks, min and max both included) - unlike
+      // niceTicks below, this never rounds min/max outward to a "nicer"
+      // number, since the domain here isn't derived from data in the
+      // first place (see renderChart's equipment-range y-axis) and
+      // rounding it would misrepresent the actual fixed range. Rounded to
+      // 3 decimal places same as niceTicks, purely to avoid float noise
+      // like 12.000000000000002 in a tick label.
+      function evenlySpacedTicks(min, max, divisions) {
+        const ticks = [];
+        for (let i = 0; i <= divisions; i++) {
+          ticks.push(Math.round((min + (i / divisions) * (max - min)) * 1000) / 1000);
+        }
+        return ticks;
+      }
+
       // "Nice" round tick values (like d3's ticks) rather than raw min/max
       // fractions - so the axis reads 0 / 0.5 / 1 rather than 0.137 / 0.482.
       function niceTicks(min, max, tickCount) {
@@ -9917,10 +10516,46 @@
 <body>
   <div id="topBar">
     <div class="topBarGroup topBarTitle">
+      <div class="titleRow">
+      <img class="brandLogo brandLogoDark" src="data:image/png;base64,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" alt="The Rivers Trust" />
+      <img class="brandLogo brandLogoLight" src="data:image/png;base64,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" alt="The Rivers Trust" />
       <h2>River Survey Dashboard</h2>
-    </div>
+      </div>
 
-    <div class="topBarDivider"></div>
+      <div class="titleInfoRow">
+      <div class="whatsNewWrap">
+        <button type="button" id="dataGuideBtn" class="whatsNewBtn" aria-haspopup="dialog" aria-expanded="false" title="Reference thresholds for every water quality determinand">
+          <span class="whatsNewIcon" aria-hidden="true">&equiv;</span>
+          Data guide
+        </button>
+        <div id="dataGuidePopover" class="whatsNewPopover dataGuidePopover" role="dialog" aria-label="Data guide" hidden>
+          <button type="button" class="whatsNewCloseBtn" id="dataGuideCloseBtn" aria-label="Close">&times;</button>
+          <div class="whatsNewHeader">Determinand thresholds</div>
+          <p class="dataGuideIntro">The Low / Slightly Elevated / Elevated / High / Very High bands used across the map, stat boxes and trend chart, per determinand. Each band's upper value is inclusive &ndash; a reading exactly on the boundary falls in the lower band.</p>
+          <div class="dataGuideTableWrap">
+            <table class="dataGuideTable" id="dataGuideTable"></table>
+          </div>
+        </div>
+      </div>
+
+      <div class="whatsNewWrap">
+        <button type="button" id="whatsNewBtn" class="whatsNewBtn" aria-haspopup="dialog" aria-expanded="false" title="See what's new in this build">
+          <span class="whatsNewIcon" aria-hidden="true">i</span>
+          What's new
+        </button>
+        <div id="whatsNewPopover" class="whatsNewPopover" role="dialog" aria-label="What's new" hidden>
+          <button type="button" class="whatsNewCloseBtn" id="whatsNewCloseBtn" aria-label="Close">&times;</button>
+          <div class="whatsNewHeader">v1.1 updates</div>
+          <ul class="whatsNewList">
+            <li><strong>Threshold bandings </strong>(Low / Slightly Elevated / Elevated / High / Very High) for the 7 NRS determinands have been produced &ndash; these threshold bands appear on the map, the charts and in the summary panel. See data guide for more information.</li>
+            <li><strong>Fixed chart axis, based on equipment range</strong> &ndash; the trend chart's y-axis defaults at the widest range the recording equipment can detect (temperature is capped at 40, as river temperature beyond that are unlikely). A "Fit to data" button on the chart switches is also available.</li>
+            <li><strong>Cleaner chart gridlines</strong> &ndash; horizontal gridlines removed from the trend chart; the axis value labels are still there for reference.</li>
+            <li><strong>Other UI improvements</strong> &ndash; The Rivers Trust logo added to the top bar, determinand picker is now a separate panel to make more room for the growing contextual layers are, buttons now more aligned and removal of vertical dividers</li>
+          </ul>
+        </div>
+      </div>
+      </div>
+    </div>
 
     <div class="topBarGroup">
       <span class="topBarLabel">View</span>
@@ -9932,8 +10567,6 @@
       </div>
     </div>
 
-    <div class="topBarDivider"></div>
-
     <div class="topBarGroup">
       <label for="orgFilter" class="topBarLabel">Organisation</label>
       <select id="orgFilter" class="onboardingHighlight" title="Select an organisation to see its sites on the map">
@@ -9944,8 +10577,6 @@
         Sites yet to be surveyed
       </label>
     </div>
-
-    <div class="topBarDivider"></div>
 
     <div class="topBarGroup">
       <label id="dateRangeLabel" class="topBarLabel" title="Only show surveys within this date range on the chart and Recent surveys carousel">Date range</label>
@@ -9982,18 +10613,12 @@
   <div id="appContainer">
 
     <div id="sidebar">
-      <div id="sidebarFilters">
-        <label id="metricListLabel" title="Choose which water quality metric sizes the map's points and appears in the chart below">Water quality metric</label>
-        <div id="metricList" class="metricList" role="listbox" aria-label="Water quality metric"></div>
-        <div id="symbolLegend"></div>
-      </div>
-
       <div id="contextualLayersPanel">
         <h3>Contextual Layers</h3>
 
         <div class="contextualTabBar">
           <button type="button" class="contextualTabButton active" data-contextual-tab="layers" title="Switch contextual layers on or off">Layers</button>
-          <button type="button" class="contextualTabButton" data-contextual-tab="legend" title="View the legend for whichever contextual layers are switched on">Legend</button>
+          <button type="button" class="contextualTabButton" data-contextual-tab="legend" title="View the legend for the selected water quality metric and whichever contextual layers are switched on">Legend</button>
         </div>
 
         <div id="contextualLayersListTab">
@@ -10029,7 +10654,7 @@
 
         <div id="contextualLayersLegendTab" hidden>
           <div id="contextualLegend"></div>
-          <p id="contextualLegendEmpty" class="contextualLegendEmpty">Switch on a contextual layer to see its legend here.</p>
+          <p id="contextualLegendEmpty" class="contextualLegendEmpty">Select an organisation, or switch on a contextual layer, to see its legend here.</p>
         </div>
       </div>
     </div>
@@ -10037,6 +10662,19 @@
     <div id="mapArea">
       <div id="mapColumn">
         <div id="viewDiv" class="onboardingHighlight" title="Click a shaded area to select that organisation, or click a point to see site details. Ctrl/Cmd-click a second point to compare two sites."></div>
+
+        <!-- Water quality metric picker - moved onto the map itself
+             (bottom-left, via view.ui.add) so the sidebar can be given
+             over entirely to the contextual layers panel, which is the
+             one expected to keep growing. Its own legend (the size ramp
+             for whichever metric is selected) no longer gets a separate
+             widget here - see updateLegendLayers - it's folded into the
+             contextual layers panel's own Legend tab instead, so there's
+             one legend list, not two. -->
+        <div id="mapMetricPicker" class="mapMetricPicker">
+          <label id="metricListLabel" title="Choose which water quality metric sizes the map's points and appears in the chart below">Determinand</label>
+          <div id="metricList" class="metricList" role="listbox" aria-label="Water quality metric"></div>
+        </div>
 
         <!-- Storm overflow popup - see the big comment above .stormPopup
              in the stylesheet for why this is hand-built rather than
@@ -10056,7 +10694,10 @@
           <div id="chartPlaceholder">Click a location on the map to see its water quality trend.</div>
 
           <div class="viz-root" id="trendChartRoot" style="display: none;">
-            <div class="chartTitle" id="chartTitle">Phosphate over time</div>
+            <div class="chartTitleRow">
+              <div class="chartTitle" id="chartTitle">Phosphate over time</div>
+              <button type="button" id="chartFitToDataBtn" class="subToggleBtn chartFitToDataBtn" aria-pressed="false" title="Scale the y-axis to fit only the data currently plotted, instead of this metric's fixed equipment detection range">Fit to data</button>
+            </div>
             <div class="chartLegend" id="chartLegend" hidden></div>
             <div class="chartWrap">
               <svg id="trendChartSvg"></svg>
