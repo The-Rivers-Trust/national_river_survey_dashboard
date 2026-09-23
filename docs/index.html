@@ -53,17 +53,17 @@
        custom properties, so those can't just live here). --- */
     :root {
       color-scheme: dark;
-      --bg-page:        #121212;
-      --surface-1:      #1a1a19;
-      --surface-2:      #262624;
-      --surface-3:      #313130;
-      --border:         #3a3a37;
-      --border-strong:  #4a4a46;
-      --text-primary:   #f5f5f3;
-      --text-secondary: #c3c2b7;
-      --text-muted:     #8f8d86;
-      --gridline:       #2c2c2a;
-      --baseline:       #454542;
+      --bg-page:        #1a1a18;
+      --surface-1:      #212120;
+      --surface-2:      #2b2b28;
+      --surface-3:      #363634;
+      --border:         #43423e;
+      --border-strong:  #524f49;
+      --text-primary:   #eae9e4;
+      --text-secondary: #b8b6ab;
+      --text-muted:     #86847c;
+      --gridline:       #333330;
+      --baseline:       #4c4b46;
       --accent:         #3987e5;
       /* Storm overflow popup status colours - one fg/bg pair per category,
          shared between the popup's date badge fill, headline text and
@@ -93,17 +93,17 @@
        (element+attribute > pseudo-class) so it doesn't need !important. */
     html[data-theme="light"] {
       color-scheme: light;
-      --bg-page:        #f3f3f0;
-      --surface-1:      #ffffff;
-      --surface-2:      #f0f0ed;
-      --surface-3:      #e6e5e0;
-      --border:         #dcdbd5;
-      --border-strong:  #c3c2ba;
-      --text-primary:   #201f1c;
-      --text-secondary: #52504a;
-      --text-muted:     #7a7970;
-      --gridline:       #e6e5e1;
-      --baseline:       #c7c6bf;
+      --bg-page:        #ece9e0;
+      --surface-1:      #f7f5ef;
+      --surface-2:      #e8e6dd;
+      --surface-3:      #ddd9cf;
+      --border:         #d0cdc2;
+      --border-strong:  #b8b4a7;
+      --text-primary:   #2c2a25;
+      --text-secondary: #57544c;
+      --text-muted:     #7d7a70;
+      --gridline:       #ddd9d0;
+      --baseline:       #bebab0;
       --accent:         #1c67c2;
       /* Light-theme pairing for the storm overflow popup status colours -
          see the :root block above for why these exist and how they're
@@ -411,6 +411,12 @@
 
     .dataGuideTable {
       border-collapse: collapse;
+      /* Fixed rather than the browser's default auto layout, so the
+         <colgroup> percentages renderDataGuideTable writes are actually
+         honored - auto sizing is what used to make the five WFD band
+         columns different widths (each sized to its own widest cell)
+         instead of all matching each other. */
+      table-layout: fixed;
       width: 100%;
       font-size: 11px;
     }
@@ -431,9 +437,118 @@
       letter-spacing: 0.02em;
     }
 
+    /* Overrides the blanket nowrap above just for the five WFD band
+       headers (Low/Slightly Elevated/Elevated/High/Very High) - now that
+       table-layout:fixed holds all five to the same width (see
+       .dataGuideTable), "Slightly Elevated" is normally the one too long
+       to fit that width on one line, and wraps onto a second rather than
+       forcing the column wider than the others.
+
+       Scoped as ".dataGuideTable th.dataGuideBandHeader", NOT bare
+       ".dataGuideBandHeader" (an earlier pass here got this wrong) -
+       ".dataGuideTable th, .dataGuideTable td" above is one class plus
+       one element, which beats a bare single-class selector on
+       specificity regardless of source order, so a plain
+       ".dataGuideBandHeader { white-space: normal }" rule never actually
+       overrode that block's white-space:nowrap at all: the header text
+       silently stayed on one line and just overflowed its fixed-width
+       column into the next one, which is exactly the overlap this was
+       supposed to fix. Matching that selector's own specificity here
+       (class+element) is what makes the override actually win.
+
+       text-align:center + the swatch stacked above the label (see
+       .dataGuideBandHeader .dataGuideSwatch/.dataGuideBandHeaderText)
+       rather than inline before it, so the column's full width is
+       available to the label text on however many lines it wraps to.
+       word-break is a last-resort safety net, not the primary fix - for
+       a band label that's a single word longer than its column. */
+    .dataGuideTable th.dataGuideBandHeader {
+      text-align: center;
+      white-space: normal;
+      word-break: break-word;
+      line-height: 1.3;
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+
+    .dataGuideTable th.dataGuideBandHeader .dataGuideSwatch {
+      display: block;
+      margin: 0 auto 4px;
+    }
+
+    .dataGuideBandHeaderText {
+      display: block;
+    }
+
     .dataGuideMetric {
       font-weight: bold;
       color: var(--text-primary);
+    }
+
+    /* Chemical notation, e.g. "(PO4)" - alongside .dataGuideMetric's
+       label rather than replacing it, so a determinand with no notation
+       (turbidity/conductivity/temperature) still reads exactly the same
+       as before. Not bold like the label itself, and muted rather than
+       the primary text color, so it reads as an annotation rather than
+       being mistaken for part of the name. */
+    .dataGuideNotation {
+      font-weight: normal;
+      color: var(--text-muted);
+    }
+
+    /* Inline "i" info button living inside a .dataGuideMetric cell (see
+       renderDataGuideTable/setupNestedInfoPopover) - position:relative
+       purely so .dataGuideMetricInfoPopover below has something to
+       anchor its position:absolute against; everything else about this
+       wrapper is just "sit inline with the label text". */
+    .dataGuideMetricInfoWrap {
+      position: relative;
+      display: inline-block;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+
+    .dataGuideMetricInfoBtn {
+      appearance: none;
+      border: none;
+      background: none;
+      padding: 0;
+      cursor: pointer;
+      display: inline-flex;
+      vertical-align: middle;
+    }
+
+    /* Same floating-card language as .whatsNewPopover (surface/border/
+       shadow), just narrower and without that one's own list/header
+       styling, since this is one short paragraph rather than a list of
+       updates. Reuses .whatsNewCloseBtn as-is for its own close (&times;)
+       button rather than a second near-identical style. z-index/position
+       matter more here than for the top-level popovers: this one has to
+       clear whichever table rows sit below the Orthophosphate row inside
+       the same scrollable Data guide popover. */
+    .dataGuideMetricInfoPopover {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      z-index: 10;
+      width: 260px;
+      max-width: calc(100vw - 64px);
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+      padding: 12px 14px 10px;
+      color: var(--text-primary);
+      font-size: 11px;
+      font-weight: normal;
+      line-height: 1.45;
+      white-space: normal;
+      text-transform: none;
+    }
+
+    .dataGuideMetricInfoPopover p {
+      margin: 0;
+      padding-right: 14px;
     }
 
     .dataGuideUnit {
@@ -1057,7 +1172,7 @@
       cursor: pointer;
     }
 
-    /* --- Applied to a .checkboxRow (see updateRiverNetworkAvailability)
+    /* --- Applied to a .checkboxRow (see updateScaleGatedLayerAvailability)
        when its layer's own minScale puts it out of reach at the current
        zoom - greyed out and inert rather than just carrying an explanatory
        tooltip, so it's obvious at a glance rather than only on hover. --- */
@@ -1068,6 +1183,36 @@
 
     .checkboxRow.scaleDisabled input[type="checkbox"] {
       cursor: not-allowed;
+    }
+
+    /* --- Groups contextual layers that are mutually exclusive (see
+       registerExclusiveLayerGroup) - switching one on switches any
+       other one in the same group off, so the group reads as a single
+       choice of background classification rather than a set of
+       independent toggles. Purely visual; the exclusivity itself is
+       enforced in JS. A thin left accent border rather than a full box,
+       consistent with how .subControlRow already indents rather than
+       boxes its own sub-choices - just enough to read as one nested
+       unit within #contextualLayersListTab. More layers are expected to
+       join this same group later (see EXCLUSIVE_LAYER_GROUPS), so
+       nothing here is sized to exactly two rows. --- */
+    .exclusiveLayerGroup {
+      margin-top: 14px;
+      padding-left: 10px;
+      border-left: 2px solid var(--border);
+    }
+
+    .exclusiveLayerGroup .checkboxRow:first-of-type {
+      margin-top: 0;
+    }
+
+    .exclusiveLayerGroupLabel {
+      margin: 0 0 4px;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--text-muted);
     }
 
     /* --- Tabs: switch the main content between the map and the league table --- */
@@ -2229,7 +2374,7 @@
       font-style: italic;
     }
 
-    /* --- Trends: one small chart per present metric (Phosphate/Nitrate/
+    /* --- Trends: one small chart per present metric (Orthophosphate/Nitrate/
        Ammonia - see renderScorecardTrendCharts), stacked in the same
        420px-wide column as the wheel above it. Left empty (no heading, no
        placeholder) when none of the three have any data for this
@@ -2807,6 +2952,102 @@
       // same Open River Network service rather than a second, easily
       // drifting copy of this URL.
       const RIVER_NETWORK_URL = "https://services3.arcgis.com/Bb8lfThdhugyc4G3/arcgis/rest/services/OpenRiverNetwork_CaBA_ID/FeatureServer/0";
+
+      // National Soil Map (LandIS Soilscapes) - see soilMapLayer further
+      // down for why its renderer is built at runtime rather than here
+      // alongside buildRiverNetworkRenderer.
+      const SOIL_MAP_URL = "https://utility.arcgis.com/usrsvcs/servers/608cab5c64ae44789d65582007fb2350/rest/services/NationalSoilMap/FeatureServer/0";
+
+      // Plain, theme-neutral placeholder fill soilMapLayer starts with -
+      // see buildSoilMapRenderer just below for the real one, swapped in
+      // once the Soilscape distinct-value query resolves.
+      function buildSoilMapPlaceholderRenderer() {
+        return {
+          type: "simple",
+          symbol: {
+            type: "simple-fill",
+            color: [170, 168, 158, 0.35],
+            outline: { color: [140, 138, 128, 0.6], width: 0.5 }
+          }
+        };
+      }
+
+      // Spaces N hues around the color wheel using the golden angle
+      // (~137.5 degrees) rather than N equal slices - the standard trick
+      // for spreading an a-priori unknown number of categories so that
+      // no two, however many there turn out to be, land close together,
+      // and so that adjacent entries in the (alphabetically) sorted
+      // Soilscape list don't end up as adjacent, easily-confused hues
+      // either. Assigned once per resolved category list, in that same
+      // fixed sorted order every time - never re-shuffled or re-cycled -
+      // see buildSoilMapRenderer below. Moderate, slightly muted
+      // saturation/lightness throughout so this reads as a soft basemap
+      // fill sitting under every other contextual/point layer (see its
+      // position in the map's layers list), not a saturated data layer
+      // competing with them.
+      const SOIL_COLOR_GOLDEN_ANGLE_DEG = 137.50776;
+      function soilscapeFillColor(index) {
+        const hue = (index * SOIL_COLOR_GOLDEN_ANGLE_DEG) % 360;
+        const rgb = hslToRgb(hue, 46, 52);
+        return rgb.concat(0.55);
+      }
+
+      // Plain HSL(0-360, 0-100, 0-100) -> [r,g,b] (0-255) conversion, only
+      // needed for soilscapeFillColor above - nothing else in this file
+      // generates colors procedurally rather than reading fixed hex
+      // values, so there's no existing helper to reuse.
+      function hslToRgb(h, s, l) {
+        h = h / 360; s = s / 100; l = l / 100;
+        function hue2rgb(p, q, t) {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1 / 6) return p + (q - p) * 6 * t;
+          if (t < 1 / 2) return q;
+          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+          return p;
+        }
+        let r, g, b;
+        if (s === 0) {
+          r = g = b = l;
+        } else {
+          const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          const p = 2 * l - q;
+          r = hue2rgb(p, q, h + 1 / 3);
+          g = hue2rgb(p, q, h);
+          b = hue2rgb(p, q, h - 1 / 3);
+        }
+        return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+      }
+
+      // Builds the real unique-value renderer for soilMapLayer from
+      // whichever Soilscape category strings its own distinct-value query
+      // (see soilMapLayer's own definition) actually resolved - the
+      // service's category list isn't known in advance, unlike
+      // buildRiverNetworkRenderer's fixed Strahler stops or
+      // WFD_CLASS_RENDERERS' fixed classification bands, both of which
+      // are hardcoded here because their category sets are already known.
+      // sortedSoilscapeValues is expected pre-sorted (alphabetically) so
+      // the color assignment below is stable across reloads rather than
+      // depending on whatever order the server happened to return rows.
+      function buildSoilMapRenderer(sortedSoilscapeValues) {
+        return {
+          type: "unique-value",
+          field: "SOILSCAPE",
+          uniqueValueInfos: sortedSoilscapeValues.map(function (value, i) {
+            return {
+              value: value,
+              label: value,
+              symbol: {
+                type: "simple-fill",
+                color: soilscapeFillColor(i),
+                outline: { color: [255, 255, 255, 0], width: 0 }
+              }
+            };
+          }),
+          defaultSymbol: buildSoilMapPlaceholderRenderer().symbol,
+          defaultLabel: "Other / no data"
+        };
+      }
 
       function buildRiverNetworkRenderer() {
         return {
@@ -3501,11 +3742,33 @@
       // renderChart), which every metric - temperature included - can
       // show, so a red temperature series would make that ring nearly
       // invisible on every one of its own flagged points.
+      // `notation` is the chemical shorthand shown in parentheses next to
+      // a metric's label - currently only read by renderDataGuideTable
+      // (see the Data guide popover), not the map metric picker, chart
+      // title, or stat boxes, so it's kept as its own optional field
+      // rather than baked into `label` itself: any of those other
+      // display sites can start reading it too later without a second
+      // copy of the notation to keep in sync. Left undefined for
+      // turbidity/conductivity/temperature, which don't have one.
+      //
+      // `infoNote`, likewise, is the (currently only) Orthophosphate row's
+      // little "i" button content in the Data guide (see
+      // renderDataGuideTable/setupNestedInfoPopover) - explains the
+      // PO4/PO4-P distinction so a reading here isn't mistaken for the
+      // Environment Agency's own PO4-P figures. Left undefined for every
+      // other metric, which just don't get an info button.
+      //
+      // determinand deliberately keeps the label's ORIGINAL wording
+      // ("Phosphate", not "Orthophosphate") even after the rename below -
+      // it's matched against the real Equipment table's own `determinand`
+      // field in computeEquipmentRanges, not shown to the user, so
+      // renaming it here would silently break that match against data
+      // this app doesn't control.
       const METRIC_CATALOG = [
-        { key: "phosphate", label: "Phosphate", locationField: "phosphateAverage", observationField: "phosphate", equipmentLimitField: "phosphate_equipment_limit", determinand: "Phosphate", colorLight: "#2a78d6", colorDark: "#3987e5", aggregation: "mean", unit: "mg/L" },
-        { key: "nitrate", label: "Nitrate", locationField: "nitrateAverage", observationField: "nitrate", equipmentLimitField: "nitrate_equipment_limit", determinand: "Nitrate", colorLight: "#eb6834", colorDark: "#d95926", aggregation: "median", unit: "mg/L" },
-        { key: "nitrite", label: "Nitrite", locationField: "nitriteAverage", observationField: "nitrite", equipmentLimitField: "nitrite_equipment_limit", determinand: "Nitrite", colorLight: "#1baf7a", colorDark: "#199e70", aggregation: "median", unit: "mg/L" },
-        { key: "ammonia", label: "Ammonia", locationField: "ammoniaAverage", observationField: "ammonia", equipmentLimitField: "ammonia_equipment_limit", determinand: "Ammonia", colorLight: "#eda100", colorDark: "#c98500", aggregation: "median", unit: "mg/L" },
+        { key: "phosphate", label: "Orthophosphate", notation: "PO₄", infoNote: "Orthophosphate may be reported elsewhere, including by the Environment Agency, as PO₄-P (phosphorus only). PO₄-P values are lower because phosphorus makes up only part of the phosphate molecule. To convert: PO₄ ÷ 3.066 = PO₄-P. For example, 0.31 mg/L PO₄ = 0.10 mg/L PO₄-P", locationField: "phosphateAverage", observationField: "phosphate", equipmentLimitField: "phosphate_equipment_limit", determinand: "Phosphate", colorLight: "#2a78d6", colorDark: "#3987e5", aggregation: "mean", unit: "mg/L" },
+        { key: "nitrate", label: "Nitrate", notation: "NO₃-N", locationField: "nitrateAverage", observationField: "nitrate", equipmentLimitField: "nitrate_equipment_limit", determinand: "Nitrate", colorLight: "#eb6834", colorDark: "#d95926", aggregation: "median", unit: "mg/L" },
+        { key: "nitrite", label: "Nitrite", notation: "NO₂-N", locationField: "nitriteAverage", observationField: "nitrite", equipmentLimitField: "nitrite_equipment_limit", determinand: "Nitrite", colorLight: "#1baf7a", colorDark: "#199e70", aggregation: "median", unit: "mg/L" },
+        { key: "ammonia", label: "Ammonia", notation: "NH₃-N", locationField: "ammoniaAverage", observationField: "ammonia", equipmentLimitField: "ammonia_equipment_limit", determinand: "Ammonia", colorLight: "#eda100", colorDark: "#c98500", aggregation: "median", unit: "mg/L" },
         { key: "turbidity", label: "Turbidity", locationField: "turbidityAverage", observationField: "turbidity", equipmentLimitField: "turbidity_equipment_limit", determinand: "Turbidity", colorLight: "#e87ba4", colorDark: "#d55181", aggregation: "mean", unit: "NTU" },
         { key: "conductivity", label: "Conductivity", locationField: "conductivityAverage", observationField: "conductivity", equipmentLimitField: "conductivity_equipment_limit", determinand: "Conductivity", colorLight: "#008300", colorDark: "#008300", aggregation: "mean", unit: "uS/cm" },
         { key: "temperature", label: "Temperature", locationField: "temperatureAverage", observationField: "water_temperature", equipmentLimitField: "water_temperature_equipment_limit", determinand: "Water Temperature", colorLight: "#4a3aa7", colorDark: "#9085e9", aggregation: "mean", unit: "°C" }
@@ -3702,7 +3965,7 @@
       // "TBD" placeholders, reserving room to grow to a full 8-spoke
       // wheel without a layout change once more metrics are ready.
       const SCORECARD_SPOKES = [
-        { key: "phosphate", label: "Phosphate", shortLabel: "P" },
+        { key: "phosphate", label: "Orthophosphate", shortLabel: "P" },
         { key: "nitrate", label: "Nitrate", shortLabel: "N" },
         { key: "wildlife", label: "Wildlife", shortLabel: "WL" },
         { key: "invasives", label: "Invasives", shortLabel: "INNS" },
@@ -4271,7 +4534,7 @@
       const WFD_CLASS_FIELD_LABELS = {
         ecological_class: "Ecological",
         ammonia_phys_chem_class: "Ammonia",
-        phosphate_class: "Phosphate"
+        phosphate_class: "Orthophosphate"
       };
 
       const catchmentsLayer = new FeatureLayer({
@@ -4314,8 +4577,10 @@
       //     that function's visualVariables stops). maxScale is left at 0
       //     (no limit), so it stays visible all the way in. The sidebar
       //     checkbox is greyed out and disabled outside that range instead
-      //     of just relying on a tooltip - see updateRiverNetworkAvailability,
-      //     watching view.scale below.
+      //     of just relying on a tooltip - see
+      //     updateScaleGatedLayerAvailability, watching view.scale below
+      //     (which also gates soilMapLayer's own checkbox - see that
+      //     layer's definition further down).
       const riverNetworkLayer = new FeatureLayer({
         url: RIVER_NETWORK_URL,
         outFields: ["name1", "form", "flow", "Strahler", "CaBA_Partnership"],
@@ -4327,6 +4592,41 @@
         // (see updateLegendLayers/contextualLegend) reads the same as the
         // toggle that switched it on.
         title: "Open River Network"
+      });
+
+      // --- Optional reference layer: the National Soil Map (LandIS
+      //     Soilscapes), symbolised by its "Soilscape" soil-type field.
+      //     Unlike every other reference layer above, that field's
+      //     category list isn't known in advance, so this layer starts
+      //     out with a plain placeholder fill (buildSoilMapPlaceholderRenderer)
+      //     and swaps in a proper unique-value renderer
+      //     (buildSoilMapRenderer) once a one-off distinct-value query
+      //     resolves - see the soilMapLayer.when().then(...) block further
+      //     down, right after the view is constructed. popupEnabled is
+      //     off, same as every other reference/backdrop layer in this
+      //     panel. Hidden by default; toggled via the sidebar checkbox -
+      //     see soilMapLayerToggle.
+      //
+      //     minScale/maxScale are read directly off riverNetworkLayer
+      //     above rather than repeating its 1000000 figure, per the
+      //     user's own instruction that this layer should only be
+      //     viewable at the same zoom range as Open River Network - so
+      //     the two can never drift apart. The sidebar checkbox is
+      //     greyed out and disabled outside that range the same way -
+      //     see updateScaleGatedLayerAvailability, which now covers both
+      //     checkboxes off the one view.scale watch. ---
+      const soilMapLayer = new FeatureLayer({
+        url: SOIL_MAP_URL,
+        outFields: ["SOILSCAPE"],
+        visible: false,
+        popupEnabled: false,
+        minScale: riverNetworkLayer.minScale,
+        maxScale: riverNetworkLayer.maxScale,
+        renderer: buildSoilMapPlaceholderRenderer(),
+        // Matches the sidebar checkbox's own label so the legend entry
+        // (see updateLegendLayers/contextualLegend) reads the same as the
+        // toggle that switched it on.
+        title: "National Soil Map"
       });
 
       // Empty until "Show flow direction" is switched on and populated by
@@ -4712,8 +5012,9 @@
 
       const map = new Map({
         basemap: BASEMAP_BY_THEME[currentTheme],
-        // catchmentsLayer sits directly above the basemap (bottom-most
-        // operational layer), with organisationLayer above that so its
+        // soilMapLayer sits directly above the basemap (bottom-most
+        // operational layer, coarse background context), with
+        // catchmentsLayer above that, then organisationLayer so its
         // boundary sits behind the river lines rather than covering them,
         // and riverNetworkLayer above that so the river centerlines draw
         // over both, with the storm overflow outfall points above that
@@ -4721,7 +5022,7 @@
         // on top of everything. riverFlowLayer (the "Show flow direction"
         // animation) is added separately, after the view is up - see the
         // try/catch around map.layers.add(riverFlowLayer) below.
-        layers: [catchmentsLayer, organisationLayer, riverNetworkLayer, ...stormOverflowLayers, allSitesLayer, locationsLayer, compareRingLayer]
+        layers: [soilMapLayer, catchmentsLayer, organisationLayer, riverNetworkLayer, ...stormOverflowLayers, allSitesLayer, locationsLayer, compareRingLayer]
       });
 
       // Sets the map's basemap from the two independent choices that
@@ -4765,6 +5066,35 @@
       } catch (err) {
         console.error("Flow-direction animation failed to initialize; continuing without it.", err);
       }
+
+      // One-off distinct-value query that builds soilMapLayer's real
+      // renderer (see buildSoilMapRenderer above) - its category list
+      // isn't known ahead of time, so this runs once, right away, rather
+      // than waiting on the sidebar checkbox: by the time anyone actually
+      // switches the layer on, the renderer (and its legend entry - the
+      // Esri Legend widget picks up a renderer change on a layer it's
+      // already watching automatically) is normally ready already.
+      // Wrapped defensively, same spirit as the riverFlowLayer try/catch
+      // just above - if this query fails for any reason, soilMapLayer
+      // just keeps its plain placeholder fill instead of breaking
+      // anything else.
+      soilMapLayer.when(function () {
+        const query = soilMapLayer.createQuery();
+        query.outFields = ["SOILSCAPE"];
+        query.returnDistinctValues = true;
+        query.returnGeometry = false;
+        return soilMapLayer.queryFeatures(query);
+      }).then(function (result) {
+        const values = result.features
+          .map(function (f) { return f.attributes.SOILSCAPE; })
+          .filter(function (v) { return v !== null && v !== undefined && v !== ""; })
+          .sort();
+        if (values.length) {
+          soilMapLayer.renderer = buildSoilMapRenderer(values);
+        }
+      }).catch(function (err) {
+        console.error("National Soil Map categories failed to load; showing a plain fill instead.", err);
+      });
 
       // --- Imagery basemap toggle, as a button on the map itself (top
       //     right, an empty corner - zoom sits top-left by default) rather
@@ -4937,7 +5267,7 @@
       riverNetworkLayerToggle.addEventListener("change", function () {
         riverNetworkLayer.visible = riverNetworkLayerToggle.checked;
         // "Show flow direction" only means anything with the network
-        // itself switched on - see updateRiverNetworkAvailability for the
+        // itself switched on - see updateScaleGatedLayerAvailability for the
         // matching scale-based half of this same disabled state.
         flowDirectionToggle.disabled = !riverNetworkLayerToggle.checked || riverNetworkLayerToggle.disabled;
         refreshRiverFlowGraphics();
@@ -4960,21 +5290,84 @@
         refreshRiverFlowGraphics();
       });
 
-      // --- Greys out and disables the Open River Network checkbox
-      //     whenever the current view scale is beyond the layer's own
-      //     minScale (see riverNetworkLayer above) - i.e. zoomed out too
-      //     far for it to draw anyway - rather than leaving it clickable
-      //     with only a tooltip explaining why nothing happens. Reads
-      //     minScale off the layer itself instead of repeating the 1000000
-      //     figure, so the two can never drift apart. Doesn't touch the
-      //     checkbox's checked state - if it was already on when you zoom
-      //     out past range, it stays on (and the layer stays out of view
-      //     via minScale on its own) so zooming back in resumes showing it
-      //     without having to re-toggle it. ---
-      function updateRiverNetworkAvailability() {
+      // National Soil Map toggle - independent of the organisation
+      // selection, same wiring style as riverNetworkLayerToggle above.
+      // Its availability (greyed out/disabled outside Open River
+      // Network's own zoom range) is handled together with that toggle -
+      // see updateScaleGatedLayerAvailability just below.
+      const soilMapLayerToggle = document.getElementById("soilMapLayerToggle");
+      const soilMapLayerRow = document.getElementById("soilMapLayerRow");
+      soilMapLayerToggle.addEventListener("change", function () {
+        soilMapLayer.visible = soilMapLayerToggle.checked;
+        updateLegendLayers();
+      });
+
+      // --- Mutually-exclusive contextual layer groups (see
+      //     .exclusiveLayerGroup in the markup/stylesheet for the visual
+      //     side of this) - within a group, switching one checkbox on
+      //     switches any other one in the same group off, so at most one
+      //     of them is ever visible; switching a checkbox off just turns
+      //     that layer off, same as normal, leaving the group with
+      //     nothing on. Requested for WFD Waterbody Classification 2025
+      //     and National Soil Map specifically, with more layers
+      //     expected to join this same group later - EXCLUSIVE_LAYER_GROUPS
+      //     is a plain list of groups (each an array of checkboxes) so
+      //     adding a future layer to this group is just adding its own
+      //     toggle to the array below, no new logic.
+      //
+      //     registerExclusiveLayerGroup adds a SECOND "change" listener
+      //     to each checkbox in a group, on top of whichever listener
+      //     already switches that specific layer on/off (catchmentsLayerToggle/
+      //     soilMapLayerToggle above) - it doesn't replace or duplicate
+      //     that per-layer logic. When a checkbox in the group is
+      //     switched on, this unchecks every other currently-checked
+      //     checkbox in the group and dispatches a "change" event on
+      //     each one, which runs that checkbox's own existing listener
+      //     exactly as if the user had unchecked it themselves (turning
+      //     its layer off, refreshing the legend, etc.) - so this never
+      //     needs to know what a given layer's own on/off logic actually
+      //     does. ---
+      function registerExclusiveLayerGroup(toggles) {
+        toggles.forEach(function (toggle) {
+          toggle.addEventListener("change", function () {
+            if (!toggle.checked) return;
+            toggles.forEach(function (other) {
+              if (other === toggle || !other.checked) return;
+              other.checked = false;
+              other.dispatchEvent(new Event("change"));
+            });
+          });
+        });
+      }
+
+      const EXCLUSIVE_LAYER_GROUPS = [
+        [catchmentsLayerToggle, soilMapLayerToggle]
+      ];
+      EXCLUSIVE_LAYER_GROUPS.forEach(registerExclusiveLayerGroup);
+
+      // --- Greys out and disables both the Open River Network and
+      //     National Soil Map checkboxes whenever the current view scale
+      //     is beyond riverNetworkLayer's own minScale (see that layer
+      //     above) - i.e. zoomed out too far for either to draw anyway -
+      //     rather than leaving them clickable with only a tooltip
+      //     explaining why nothing happens. soilMapLayer shares
+      //     riverNetworkLayer's exact minScale/maxScale (see its own
+      //     definition above, which reads them directly off
+      //     riverNetworkLayer rather than repeating the 1000000 figure),
+      //     which is why one scale check here covers both rather than
+      //     needing a second, near-identical function - the two layers
+      //     and this check can never drift apart from each other.
+      //     Doesn't touch either checkbox's checked state - if one was
+      //     already on when you zoom out past range, it stays on (and
+      //     the layer stays out of view via minScale on its own) so
+      //     zooming back in resumes showing it without having to
+      //     re-toggle it. ---
+      function updateScaleGatedLayerAvailability() {
         const available = view.scale <= riverNetworkLayer.minScale;
         riverNetworkLayerToggle.disabled = !available;
         riverNetworkLayerRow.classList.toggle("scaleDisabled", !available);
+        soilMapLayerToggle.disabled = !available;
+        soilMapLayerRow.classList.toggle("scaleDisabled", !available);
         // "Show flow direction" needs both this scale condition AND the
         // network layer's own checkbox switched on - see that toggle's
         // change handler above for the other half of this.
@@ -5082,8 +5475,8 @@
       view.watch("stationary", function (stationary) {
         if (stationary) positionStormPopup();
       });
-      view.watch("scale", updateRiverNetworkAvailability);
-      updateRiverNetworkAvailability();
+      view.watch("scale", updateScaleGatedLayerAvailability);
+      updateScaleGatedLayerAvailability();
 
       // Storm Overflows toggle - independent of the organisation selection
       // and of every other contextual layer, same wiring style as
@@ -5263,19 +5656,112 @@
       // this table can never drift out of sync with what the rest of
       // the app actually shows. Built once at startup since none of
       // those constants change at runtime.
+      // Determinand/Unit column widths (as a % of the table), with the
+      // rest split evenly across however many WFD bands there are -
+      // computed rather than hardcoded per band so the table stays
+      // balanced if WFD_BAND_STYLE ever gains/loses a band. Paired with
+      // table-layout:fixed (see .dataGuideTable) so these percentages are
+      // actually honored instead of the browser auto-sizing each column
+      // to its widest cell, which is what used to make the five band
+      // columns different widths from each other (whichever band's
+      // header/values happened to be the longest text). "Slightly
+      // Elevated" is the one likely to still be too wide for its equal
+      // share of the remaining space - see .dataGuideBandHeader, which
+      // lets a band header wrap onto a second line rather than forcing
+      // the columns back out of alignment to fit it on one.
+      const DATA_GUIDE_DETERMINAND_COL_PCT = 24;
+      const DATA_GUIDE_UNIT_COL_PCT = 8;
+
+      // --- Nested "i" info popovers inside the Data guide table itself
+      //     (currently just Orthophosphate's PO4/PO4-P note - see
+      //     METRIC_CATALOG's infoNote field and renderDataGuideTable
+      //     below). Deliberately its own small function rather than
+      //     reusing setupInfoPopover/infoPopoverClosers - that pair calls
+      //     closeAllInfoPopovers() whenever one of them opens, which is
+      //     exactly right for What's new/Data guide (only one of those
+      //     two top-level popovers should ever be open), but wrong here:
+      //     this popover lives INSIDE the Data guide popover, so treating
+      //     it as another member of that same "close all the others"
+      //     group would close its own parent the moment it's opened.
+      //     Fully self-contained instead - its own toggle, its own
+      //     outside-click/Escape handling, closing only itself. ---
+      function setupNestedInfoPopover(btn, popover) {
+        function close() {
+          popover.hidden = true;
+          btn.setAttribute("aria-expanded", "false");
+          document.removeEventListener("click", handleOutsideClick);
+          document.removeEventListener("keydown", handleEscape);
+        }
+        function handleOutsideClick(evt) {
+          if (!popover.contains(evt.target) && !btn.contains(evt.target)) close();
+        }
+        function handleEscape(evt) {
+          if (evt.key === "Escape") close();
+        }
+        btn.addEventListener("click", function (evt) {
+          evt.stopPropagation();
+          if (popover.hidden) {
+            popover.hidden = false;
+            btn.setAttribute("aria-expanded", "true");
+            document.addEventListener("click", handleOutsideClick);
+            document.addEventListener("keydown", handleEscape);
+          } else {
+            close();
+          }
+        });
+        const closeBtn = popover.querySelector(".dataGuideMetricInfoCloseBtn");
+        if (closeBtn) closeBtn.addEventListener("click", function (evt) { evt.stopPropagation(); close(); });
+      }
+
       function renderDataGuideTable() {
         const table = document.getElementById("dataGuideTable");
         if (!table) return;
 
-        let html = "<thead><tr><th>Determinand</th><th>Unit</th>";
+        const bandColPct = (100 - DATA_GUIDE_DETERMINAND_COL_PCT - DATA_GUIDE_UNIT_COL_PCT) / WFD_BAND_STYLE.length;
+
+        let html = "<colgroup>";
+        html += '<col style="width:' + DATA_GUIDE_DETERMINAND_COL_PCT + '%">';
+        html += '<col style="width:' + DATA_GUIDE_UNIT_COL_PCT + '%">';
+        WFD_BAND_STYLE.forEach(function () {
+          html += '<col style="width:' + bandColPct + '%">';
+        });
+        html += "</colgroup>";
+
+        html += "<thead><tr><th>Determinand</th><th>Unit</th>";
         WFD_BAND_STYLE.forEach(function (band) {
-          html += '<th><span class="dataGuideSwatch" style="background:' + band.color + '"></span>' + band.label + "</th>";
+          // Swatch stacked ABOVE the label (rather than inline before it,
+          // like .dataGuideSwatch's default) and centered - see
+          // .dataGuideBandHeader/.dataGuideBandHeaderText - so the full
+          // column width is free for the text itself, on however many
+          // lines it needs. That, plus table-layout:fixed holding every
+          // band column to the same width (see .dataGuideTable), is what
+          // "Slightly Elevated" wrapping onto two lines actually depends
+          // on - without the stacked swatch, the inline version ate
+          // enough width that even "Elevated" alone could overflow past
+          // its column into the next one.
+          html += '<th class="dataGuideBandHeader"><span class="dataGuideSwatch" style="background:' + band.color + '"></span><span class="dataGuideBandHeaderText">' + band.label + "</span></th>";
         });
         html += "</tr></thead><tbody>";
 
         METRIC_CATALOG.forEach(function (m) {
           const thresholds = WFD_METRIC_THRESHOLDS[m.key];
-          html += '<tr><td class="dataGuideMetric">' + m.label + '</td><td class="dataGuideUnit">' + m.unit + "</td>";
+          // Chemical notation (e.g. "PO4"/"NH3-N") shown after the label,
+          // only for the metrics that have one - see METRIC_CATALOG.
+          const notation = m.notation ? ' <span class="dataGuideNotation">(' + m.notation + ')</span>' : "";
+          // Inline "i" info button + its own popover, only for the
+          // metrics that have an infoNote (currently just Orthophosphate)
+          // - see setupNestedInfoPopover above for why this isn't wired
+          // through the shared What's new/Data guide popover mechanism.
+          const infoButton = m.infoNote
+            ? '<span class="dataGuideMetricInfoWrap">'
+              + '<button type="button" class="dataGuideMetricInfoBtn" data-info-key="' + m.key + '" aria-haspopup="dialog" aria-expanded="false" title="How ' + m.label + ' compares to reported phosphorus-only values"><span class="whatsNewIcon" aria-hidden="true">i</span></button>'
+              + '<div class="dataGuideMetricInfoPopover" data-info-popover="' + m.key + '" hidden>'
+              + '<button type="button" class="whatsNewCloseBtn dataGuideMetricInfoCloseBtn" aria-label="Close">&times;</button>'
+              + "<p>" + m.infoNote + "</p>"
+              + "</div>"
+              + "</span>"
+            : "";
+          html += '<tr><td class="dataGuideMetric">' + m.label + notation + infoButton + '</td><td class="dataGuideUnit">' + m.unit + "</td>";
           if (!thresholds) {
             html += '<td colspan="' + WFD_BAND_STYLE.length + '">No thresholds defined</td>';
           } else {
@@ -5298,6 +5784,12 @@
 
         html += "</tbody>";
         table.innerHTML = html;
+
+        table.querySelectorAll(".dataGuideMetricInfoBtn").forEach(function (btn) {
+          const key = btn.dataset.infoKey;
+          const popover = table.querySelector('.dataGuideMetricInfoPopover[data-info-popover="' + key + '"]');
+          if (popover) setupNestedInfoPopover(btn, popover);
+        });
       }
 
       renderDataGuideTable();
@@ -5699,6 +6191,9 @@
         }
         if (riverNetworkLayer.visible) {
           contextualInfos.push({ layer: riverNetworkLayer, title: riverNetworkLayer.title });
+        }
+        if (soilMapLayer.visible) {
+          contextualInfos.push({ layer: soilMapLayer, title: soilMapLayer.title });
         }
         // Only ever the first of stormOverflowLayers - see the comment
         // above their construction for why one legend entry is enough for
@@ -6948,7 +7443,7 @@
 
       // ================================================================
       // Scorecards Trends charts - one small line chart per present
-      // metric (Phosphate/Nitrate/Ammonia) inside the NRS panel, built
+      // metric (Orthophosphate/Nitrate/Ammonia) inside the NRS panel, built
       // from computeWaterbodyScorecard's *Series arrays (every individual
       // dated reading, already pooled across the whole waterbody and
       // narrowed to the app's date range). Deliberately a separate, much
@@ -7309,7 +7804,7 @@
 
       // Rebuilds the whole Trends section for the currently open NRS
       // panel from a computeWaterbodyScorecard result - one chart per
-      // metric that actually has readings, in a fixed Phosphate/Nitrate/
+      // metric that actually has readings, in a fixed Orthophosphate/Nitrate/
       // Ammonia order; the container is left empty (not hidden - it just
       // has nothing in it) if none of the three have any data.
       function renderScorecardTrendCharts(scorecard) {
@@ -7957,7 +8452,7 @@
       // "reading count" for a presence/absence field the way there is for
       // a numeric one).
       function scorecardDataAmountCaption(scorecard) {
-        let caption = "Based on " + scorecard.phosphateReadingCount + " phosphate, "
+        let caption = "Based on " + scorecard.phosphateReadingCount + " orthophosphate, "
           + scorecard.nitrateReadingCount + " nitrate and " + scorecard.ammoniaReadingCount
           + " ammonia reading" + (scorecard.nitrateReadingCount === 1 && scorecard.ammoniaReadingCount === 1 ? "" : "s")
           + "; wildlife/invasives checked across " + scorecard.observationCount
@@ -8199,7 +8694,7 @@
         // on-screen panel (renderScorecardTrendChart), just drawn to an
         // offscreen canvas instead of live SVG since that's what jsPDF can
         // actually embed - see renderScorecardTrendChartImage. One image
-        // per metric that has data, in a fixed Phosphate/Nitrate/Ammonia
+        // per metric that has data, in a fixed Orthophosphate/Nitrate/Ammonia
         // order; the whole section is skipped if none of the three do.
         const trendGranularity = scorecardChartBucketGranularity();
         const CHART_PIXEL_WIDTH = 1000, CHART_PIXEL_HEIGHT = 380;
@@ -8266,7 +8761,7 @@
         doc.setFontSize(8);
         doc.setTextColor(120, 120, 120);
         const disclaimer = doc.splitTextToSize(
-          "Phosphate thresholds follow the published WFD classification. Nitrate/ammonia, wildlife and "
+          "Orthophosphate thresholds follow the published WFD classification. Nitrate/ammonia, wildlife and "
           + "invasive-species thresholds are a provisional first pass, not yet reviewed water-quality standards.",
           contentWidth
         );
@@ -10622,15 +11117,30 @@
         </div>
 
         <div id="contextualLayersListTab">
-          <label id="catchmentsLayerRow" class="checkboxRow" title="Overlay the Environment Agency's WFD river catchment boundaries. Choose which classification colors them (Ecological/Ammonia/Phosphate) with the buttons below. Not tied to the selected organisation - click a catchment on the map for its details.">
-            <input type="checkbox" id="catchmentsLayerToggle" />
-            WFD Waterbody Classification 2025
-          </label>
+          <!-- Mutually-exclusive group (see registerExclusiveLayerGroup) -
+               only one of these can be switched on at a time; switching
+               one on switches any other in the group off. More layers
+               are expected to join this group later (see
+               EXCLUSIVE_LAYER_GROUPS), so this wrapper isn't sized to
+               exactly two rows. -->
+          <div id="classificationLayerGroup" class="exclusiveLayerGroup" role="group" aria-label="Background classification layers - only one can be switched on at a time">
+            <p class="exclusiveLayerGroupLabel">Background Mapping (single select)</p>
 
-          <div class="subControlRow wfdClassRow">
-            <button type="button" class="subToggleBtn wfdClassBtn active" data-wfd-field="ecological_class" aria-pressed="true" title="Color catchments by ecological classification (High/Good/Moderate/Poor/Bad) - the Environment Agency's headline WFD status.">Ecological</button>
-            <button type="button" class="subToggleBtn wfdClassBtn" data-wfd-field="ammonia_phys_chem_class" aria-pressed="false" title="Color catchments by ammonia physico-chemical classification (High/Good/Moderate/Poor/Bad).">Ammonia</button>
-            <button type="button" class="subToggleBtn wfdClassBtn" data-wfd-field="phosphate_class" aria-pressed="false" title="Color catchments by phosphate classification (High/Good/Moderate/Poor/Bad).">Phosphate</button>
+            <label id="catchmentsLayerRow" class="checkboxRow" title="Overlay the Environment Agency's WFD river catchment boundaries. Choose which classification colors them (Ecological/Ammonia/Orthophosphate) with the buttons below. Not tied to the selected organisation - click a catchment on the map for its details. Only one classification layer can be shown at a time - switching this on switches off any other below.">
+              <input type="checkbox" id="catchmentsLayerToggle" />
+              WFD Waterbody Classification 2025
+            </label>
+
+            <div class="subControlRow wfdClassRow">
+              <button type="button" class="subToggleBtn wfdClassBtn active" data-wfd-field="ecological_class" aria-pressed="true" title="Color catchments by ecological classification (High/Good/Moderate/Poor/Bad) - the Environment Agency's headline WFD status.">Ecological</button>
+              <button type="button" class="subToggleBtn wfdClassBtn" data-wfd-field="ammonia_phys_chem_class" aria-pressed="false" title="Color catchments by ammonia physico-chemical classification (High/Good/Moderate/Poor/Bad).">Ammonia</button>
+              <button type="button" class="subToggleBtn wfdClassBtn" data-wfd-field="phosphate_class" aria-pressed="false" title="Color catchments by orthophosphate classification (High/Good/Moderate/Poor/Bad).">Orthophosphate</button>
+            </div>
+
+            <label id="soilMapLayerRow" class="checkboxRow" title="Overlay the National Soil Map (LandIS Soilscapes), symbolised by soil type. Not tied to the selected organisation. Only available at the same zoom range as Open River Network below. Only one classification layer can be shown at a time - switching this on switches off any other above.">
+              <input type="checkbox" id="soilMapLayerToggle" />
+              National Soil Map
+            </label>
           </div>
 
           <label id="riverNetworkLayerRow" class="checkboxRow" title="Overlay the Open River Network's river centerlines for Great Britain, symbolized by Strahler stream order (thin headwaters, thick major rivers). Not tied to the selected organisation.">
@@ -10695,7 +11205,7 @@
 
           <div class="viz-root" id="trendChartRoot" style="display: none;">
             <div class="chartTitleRow">
-              <div class="chartTitle" id="chartTitle">Phosphate over time</div>
+              <div class="chartTitle" id="chartTitle">Orthophosphate over time</div>
               <button type="button" id="chartFitToDataBtn" class="subToggleBtn chartFitToDataBtn" aria-pressed="false" title="Scale the y-axis to fit only the data currently plotted, instead of this metric's fixed equipment detection range">Fit to data</button>
             </div>
             <div class="chartLegend" id="chartLegend" hidden></div>
@@ -10723,7 +11233,7 @@
             </div>
             <div class="statBox">
               <div class="value" id="statPhosphate"></div>
-              <div class="label">Avg Phosphate (mg/L)</div>
+              <div class="label">Avg Orthophosphate (mg/L)</div>
             </div>
             <div class="statBox">
               <div class="value" id="statNitrate"></div>
