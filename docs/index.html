@@ -44,118 +44,132 @@
   </script>
 
   <style>
-    /* --- Dashboard-wide theme, dark by default. Every panel, the chart,
-       and the ArcGIS widgets read from these tokens rather than fixed
-       colors, so the light variant just below is a straight swap of the
-       same names - see setTheme()/initTheme() in the script, which also
-       swaps the ArcGIS widget theme stylesheet, the basemap, and the map's
-       renderer colors (Arcade/ArcGIS symbols read plain hex, not CSS
-       custom properties, so those can't just live here). --- */
+    /* =====================================================================
+       CALCITE STYLE: design tokens
+       Hardcoded copies of Esri's own published Calcite Design System
+       values (https://developers.arcgis.com/calcite-design-system/foundations/),
+       not a live link to Calcite's CSS - keeps this file self-contained and
+       not dependent on an external stylesheet loading correctly. Named to
+       match how the rest of this file already expects to consume them
+       (--surface-1, --text-primary, --accent, etc.) so swapping the theme
+       later just means editing these two blocks, same as before.
+       ===================================================================== */
     :root {
       color-scheme: dark;
-      --bg-page:        #1a1a18;
-      --surface-1:      #212120;
-      --surface-2:      #2b2b28;
-      --surface-3:      #363634;
-      --border:         #43423e;
-      --border-strong:  #524f49;
-      --text-primary:   #eae9e4;
-      --text-secondary: #b8b6ab;
-      --text-muted:     #86847c;
-      --gridline:       #333330;
-      --baseline:       #4c4b46;
-      --accent:         #3987e5;
-      /* Elevation shadow for the five structural "card" panels (top bar,
-         left/right panels, map, chart) - see .dashboardCard and #viewDiv
-         further down. A page background this dark needs a visibly
-         stronger shadow than the light theme's own pairing below to read
-         as elevated at all - a shadow subtle enough to look right against
-         a near-white surface just disappears against near-black. */
-      --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
-      /* Storm overflow popup status colours - one fg/bg pair per category,
-         shared between the popup's date badge fill, headline text and
-         "ACTIVE" pill (see .stormPopupCard--* further down) and
-         independent of --accent since these encode discharge status, not
-         app chrome. This custom-built popup (see #stormPopup) reads
-         these - and every other --* token here - directly, unlike Esri's
-         own Popup widget, which is why it can actually be made to follow
-         the theme toggle reliably. Dark-theme values favour lighter,
-         slightly desaturated tints; see html[data-theme="light"] below
-         for the light-theme pairing. */
-      --storm-spilling:    #ff6f61;
-      --storm-spilling-bg: rgba(255, 111, 97, 0.18);
-      --storm-recent:      #ffb648;
-      --storm-recent-bg:   rgba(255, 182, 72, 0.18);
-      --storm-notspilling: #6fd897;
-      --storm-notspilling-bg: rgba(111, 216, 151, 0.16);
-      --storm-offline:     #b9b8ad;
-      --storm-offline-bg:  rgba(185, 184, 173, 0.16);
+      --bg-page:            #212121; /* calcite surface-1 (dark) */
+      --surface-1:          #2b2b2b; /* calcite surface-2 (dark) - cards, panels, topbar */
+      --surface-2:          #363636; /* calcite surface-3 (dark) - inputs, hover fill */
+      --surface-3:          #404040; /* calcite surface-4 (dark) - deeper hover/active */
+      --surface-highlight:  #2b465f; /* calcite surface-highlight (dark) */
+      --text-primary:       #ffffff; /* calcite text-1 (dark) */
+      --text-secondary:     #bfbfbf; /* calcite text-2 (dark) */
+      --text-muted:         #9e9e9e; /* calcite text-3 (dark) */
+      --text-inverse:       #141414; /* calcite text-inverse (dark) - text on brand fills */
+      --border:             #4a4a4a; /* calcite border-2 (dark) */
+      --border-subtle:      #404040; /* calcite border-3 (dark) - gridlines/dividers */
+      --border-strong:      #545454; /* calcite border-1 (dark) */
+      --border-input:       #757575; /* calcite border-input (dark) */
+      --accent:             #009af2; /* calcite brand (dark) */
+      --accent-hover:       #40b9ff; /* calcite brand-hover (dark) */
+      --accent-press:       #80d1ff; /* calcite brand-press (dark) */
+      --accent-bg:          rgba(0, 154, 242, 0.16); /* brand tint for selected rows/chips */
+      --status-success:     #36da43;
+      --status-success-bg:  rgba(54, 218, 67, 0.16);
+      --status-warning:     #f89927;
+      --status-warning-bg:  rgba(248, 153, 39, 0.16);
+      --status-danger:      #fe583e;
+      --status-danger-bg:   rgba(254, 88, 62, 0.16);
+      --status-neutral:     var(--text-muted);
+      --status-neutral-bg:  rgba(158, 158, 158, 0.16);
+      --shadow-sm: 0 2px 8px 0 rgba(0, 0, 0, 0.32), 0 2px 8px 0 rgba(0, 0, 0, 0.18);
+      --shadow-md: 0 6px 20px -4px rgba(0, 0, 0, 0.4), 0 4px 12px -2px rgba(0, 0, 0, 0.28);
+      --radius-xs: 2px;
+      --radius-sm: 4px;
+      --radius-pill: 9999px;
+      --font-family: "Avenir Next", "Avenir", "Helvetica Neue", sans-serif;
     }
 
-    /* Light palette - same warm-gray undertone as the dark set above, just
-       inverted, plus a slightly darker accent blue for AA contrast against
-       a white surface. Applied via html[data-theme="light"] rather than
-       @media (prefers-color-scheme) since this is a user-picked toggle,
-       not an OS-follow. Specificity-wise this beats the :root block above
-       (element+attribute > pseudo-class) so it doesn't need !important. */
+    /* Light theme pairing for every token above - a user-picked toggle
+       (see setTheme), not @media (prefers-color-scheme), so it's an
+       html[data-theme] override rather than a query. */
     html[data-theme="light"] {
       color-scheme: light;
-      --bg-page:        #ece9e0;
-      --surface-1:      #f7f5ef;
-      --surface-2:      #e8e6dd;
-      --surface-3:      #ddd9cf;
-      --border:         #d0cdc2;
-      --border-strong:  #b8b4a7;
-      --text-primary:   #2c2a25;
-      --text-secondary: #57544c;
-      --text-muted:     #7d7a70;
-      --gridline:       #ddd9d0;
-      --baseline:       #bebab0;
-      --accent:         #1c67c2;
-      /* Light-theme pairing for --card-shadow above - noticeably lighter
-         than the dark theme's own value, since the same shadow strength
-         would look muddy/heavy against a near-white surface. */
-      --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
-      /* Light-theme pairing for the storm overflow popup status colours -
-         see the :root block above for why these exist and how they're
-         used. Solid pale washes rather than the dark theme's translucent
-         tints, matching how --surface-1/2/3 are also solid here but
-         translucency-friendly there. */
-      --storm-spilling:    #b3261e;
-      --storm-spilling-bg: #fdecea;
-      --storm-recent:      #8a5a00;
-      --storm-recent-bg:   #fff4e0;
-      --storm-notspilling: #1e7d3c;
-      --storm-notspilling-bg: #e8f7ec;
-      --storm-offline:     #5f6368;
-      --storm-offline-bg:  #f1f1ef;
+      --bg-page:            #f7f7f7; /* calcite surface-1 (light) */
+      --surface-1:          #ffffff; /* calcite surface-2 (light) */
+      --surface-2:          #f2f2f2; /* calcite surface-3 (light) */
+      --surface-3:          #ebebeb; /* calcite surface-4 (light) */
+      --surface-highlight:  #d6efff; /* calcite surface-highlight (light) */
+      --text-primary:       #141414; /* calcite text-1 (light) */
+      --text-secondary:     #4a4a4a; /* calcite text-2 (light) */
+      --text-muted:         #6b6b6b; /* calcite text-3 (light) */
+      --text-inverse:       #ffffff; /* calcite text-inverse (light) */
+      --border:             #dedede; /* calcite border-2 (light) */
+      --border-subtle:      #ebebeb; /* calcite border-3 (light) */
+      --border-strong:      #d4d4d4; /* calcite border-1 (light) */
+      --border-input:       #949494; /* calcite border-input (light) */
+      --accent:             #007ac2; /* calcite brand (light) */
+      --accent-hover:       #00619b; /* calcite brand-hover (light) */
+      --accent-press:       #004874; /* calcite brand-press (light) */
+      --accent-bg:          rgba(0, 122, 194, 0.12); /* brand tint for selected rows/chips */
+      --status-success:     #288835;
+      --status-success-bg:  rgba(40, 136, 53, 0.12);
+      --status-warning:     #da7c0b;
+      --status-warning-bg:  rgba(218, 124, 11, 0.12);
+      --status-danger:      #d83020;
+      --status-danger-bg:   rgba(216, 48, 32, 0.12);
+      --status-neutral:     var(--text-muted);
+      --status-neutral-bg:  rgba(107, 107, 107, 0.1);
     }
 
+    /* --- Base / reset --- */
     html, body {
       padding: 0;
       margin: 0;
       height: 100%;
       width: 100%;
-      font-family: sans-serif;
-      font-size: 14px;
-      background: var(--bg-page);
-      color: var(--text-primary);
     }
-
-    /* body is now a column: the full-width #topBar (selections/filters)
-       stacked above #appContainer (sidebar/map/details), rather than
-       #appContainer alone filling the whole viewport - see #topBar below
-       for why these moved out of the sidebar. A page-level padding plus a
-       matching gap between every top-level panel is what turns the old
-       edge-to-edge layout into separated "cards" (see .dashboardCard
-       below) - both need to move together if this spacing is ever
-       revisited. */
     body {
       display: flex;
       flex-direction: column;
       padding: 12px;
       box-sizing: border-box;
       gap: 12px;
+      background: var(--bg-page);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      font-size: 13px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3, h4 {
+      font-family: inherit;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    button {
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+    }
+    a {
+      color: var(--accent);
+    }
+    a:hover {
+      color: var(--accent-hover);
+    }
+    ::selection {
+      background: var(--surface-highlight);
+    }
+    /* A consistent focus ring everywhere, Calcite's own brand-blue outline
+       rather than each browser's default - :focus-visible so it only shows
+       up for keyboard focus, not every mouse click. */
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    a:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
     }
 
     #appContainer {
@@ -166,190 +180,98 @@
       gap: 12px;
     }
 
-    /* --- Shared "card" look for the 5 structural panels (top bar,
-       sidebar, map, details panel, chart) - rounded corners plus a
-       theme-aware elevation shadow (--card-shadow, defined per-theme
-       above). Applied via class since it's purely cosmetic and shared
-       across otherwise-unrelated elements; each element's own #id rule
-       still owns its layout (width/flex/padding/etc) and now a full
-       all-around border (replacing the old single-side borders that
-       only made sense in the previous edge-to-edge layout).
-       #viewDiv (the map) deliberately does NOT get this class - see the
-       comment on #viewDiv itself for why it needs a self-contained
-       border-free treatment instead. */
-    .dashboardCard {
-      border-radius: 12px;
-      box-shadow: var(--card-shadow);
-    }
-
-    /* --- Top bar: every selection/filter that isn't specific to the
-       water quality metrics or the contextual layers panel - the Map/Site
-       league table tabs, organisation + location count, date range, and
-       "Sites yet to be surveyed" - pulled up here, out of what was an
-       increasingly crowded sidebar, so the sidebar itself can stay
-       focused on just those two things (see #sidebar below). A single
-       flex row that wraps onto more than one line on a narrow viewport
-       rather than the sidebar's old vertical stack, so each group here
-       resets its own label/spacing rather than inheriting #sidebar
-       label's vertical-stack margins. */
-    /* align-items: flex-start (not flex-end) so every group's label starts
-       on the same top line - since every group leads with a
-       same-size .topBarLabel plus the same 4px gap, that keeps the actual
-       control right under it (the tabs, the org select, the date inputs)
-       lined up at one common height, regardless of how many extra rows a
-       given group has below (Organisation's "Sites yet to be surveyed"
-       checkbox, for one) - bottom-alignment let a taller group push
-       shorter groups' controls down out of line with each other. */
+    /* --- Top bar --- */
     #topBar {
       display: flex;
       align-items: flex-start;
       flex-wrap: wrap;
       gap: 20px;
       padding: 10px 16px;
+      box-sizing: border-box;
       background: var(--surface-1);
       border: 1px solid var(--border);
-      box-sizing: border-box;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
     }
-
     .topBarGroup {
       display: flex;
       flex-direction: column;
       gap: 4px;
     }
-
     .topBarLabel {
-      font-weight: bold;
-      font-size: 13px;
+      font-weight: 600;
+      font-size: 12px;
       color: var(--text-secondary);
     }
-
     #topBar #tabBar {
       margin-top: 0;
     }
-
-    /* .tabButton's flex: 1 assumed a narrow sidebar column to fill -
-       here in the top bar it would otherwise stretch to fill whatever
-       space wrapping leaves it, so each button just sizes to its own
-       label instead. */
     #topBar .tabButton {
       flex: none;
       padding: 6px 14px;
     }
-
     #topBar #orgFilter {
       width: 220px;
     }
-
-    /* The tab buttons, the org select and the date inputs each reach this
-       height differently on their own (a button element at 12px font vs.
-       a select/date-input element inheriting the page's 14px, plus
-       whatever native chrome the browser adds to a select/date control) -
-       pinning all three to one explicit height is what actually makes
-       them line up, since matching padding alone isn't enough. */
     #topBar .tabButton,
     #topBar #orgFilter,
     #topBar .dateRangeRow input[type="date"] {
       height: 34px;
       box-sizing: border-box;
     }
-
     #topBar .checkboxRow {
       margin-top: 0;
     }
-
-    /* App title, first item in the top bar. No label sits above it like
-       the other groups, so it's given its own class rather than
-       .topBarLabel + control. Column, the same as a plain .topBarGroup
-       (logo+text row on top, the What's new button below it, left
-       aligned under the logo) - .titleRow underneath carries the row
-       layout the logo+text themselves need.
-       Given a fixed width (rather than sizing to the logo+text content)
-       so the "View" group right after it always starts at the same x
-       regardless of how wide the title text happens to render: 320
-       (#sidebar's own border-box width) minus 16 (#topBar's left
-       padding, which #sidebar's left padding matches) minus 20 (the
-       gap #topBar puts before the next group) plus 12 (the gap
-       #appContainer now puts between #sidebar and #mapArea, which
-       shifts #mapColumn's left edge right by that much - see
-       #appContainer above) = 296, landing the View group's left edge
-       flush with #mapColumn/#viewDiv's left edge below. Overridden
-       back to auto in the narrow-layout media query, where groups
-       stack full-width instead of sitting side by side. */
     .topBarTitle {
       align-items: flex-start;
       gap: 12px;
       width: 296px;
       box-sizing: border-box;
     }
-
     .topBarTitle .titleRow {
       display: flex;
       align-items: center;
       gap: 10px;
     }
-
     .topBarTitle h2 {
       margin: 0;
-      font-size: 16px;
       white-space: nowrap;
-      color: var(--text-primary);
+      font-size: 16px;
     }
-
-    /* The Rivers Trust logo. Two PNGs (one for each theme) rather than
-       one recolored via CSS, since the source art is a multi-color
-       gradient icon in the dark build and a plain reversed-white one in
-       the light build, not a simple single-tone swap. Both are the same
-       intrinsic size, so only one needs to lay out - the other is just
-       display:none - and toggling which is which follows the same
-       html[data-theme="light"] switch as every other theme override in
-       this file (see setTheme). */
     .brandLogo {
       height: 28px;
       width: auto;
       display: block;
     }
-
     .brandLogoLight {
       display: none;
     }
-
     html[data-theme="light"] .brandLogoDark {
       display: none;
     }
-
     html[data-theme="light"] .brandLogoLight {
       display: block;
     }
-
-    /* What's new button + popover - sits under the logo/title row inside
-       .topBarTitle (see .titleRow above), a small pill button matching
-       .themeToggleBtn's own look/sizing, with a popover styled like
-       .stormPopup (same surface/border/shadow) since it's the same kind
-       of lightweight floating info card, just anchored to a fixed UI
-       button instead of a map point - no arrow needed. */
     .whatsNewWrap {
       position: relative;
     }
-
     .whatsNewBtn {
       display: flex;
       align-items: center;
       gap: 5px;
       padding: 3px 9px 3px 6px;
-      background: var(--surface-2);
-      border: 1px solid var(--border-strong);
-      border-radius: 14px;
-      color: var(--text-secondary);
-      font-size: 11px;
       cursor: pointer;
       white-space: nowrap;
+      background: var(--surface-2);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-pill);
+      font-size: 12px;
     }
-
     .whatsNewBtn:hover {
       border-color: var(--accent);
       color: var(--accent);
     }
-
     .whatsNewIcon {
       display: inline-flex;
       align-items: center;
@@ -357,15 +279,7 @@
       width: 14px;
       height: 14px;
       flex-shrink: 0;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #fff;
-      font-size: 10px;
-      font-style: italic;
-      font-weight: bold;
-      font-family: Georgia, serif;
     }
-
     .whatsNewPopover {
       position: absolute;
       top: calc(100% + 8px);
@@ -374,196 +288,115 @@
       width: 320px;
       max-height: 360px;
       overflow-y: auto;
+      padding: 14px 16px 12px;
       background: var(--surface-1);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-      padding: 14px 16px 12px;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
       color: var(--text-primary);
-      font-size: 12px;
-      line-height: 1.45;
-    }
-
-    .whatsNewHeader {
-      font-weight: bold;
       font-size: 13px;
+    }
+    .whatsNewHeader {
       margin: 0 0 8px;
       padding-right: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
     }
-
     .whatsNewList {
       margin: 0;
       padding-left: 18px;
       display: flex;
       flex-direction: column;
       gap: 8px;
+      color: var(--text-secondary);
     }
-
     .whatsNewCloseBtn {
       position: absolute;
       top: 10px;
       right: 10px;
-      appearance: none;
-      border: none;
-      background: none;
       cursor: pointer;
-      color: var(--text-muted);
-      font-size: 18px;
-      line-height: 1;
       padding: 2px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      border-radius: var(--radius-xs);
     }
-
     .whatsNewCloseBtn:hover {
       color: var(--text-primary);
+      background: var(--surface-2);
     }
-
-    /* Row holding both info buttons (Data guide, What's new) side by
-       side under the logo/title - each still gets its own .whatsNewWrap
-       (position: relative) so its popover anchors under itself rather
-       than under the row as a whole. */
     .titleInfoRow {
       display: flex;
       gap: 8px;
     }
-
-    /* Wider than the shared .whatsNewPopover default - a threshold table
-       for seven determinands needs the room, unlike the plain bullet
-       list What's new uses. Capped so it never runs off a narrow
-       window; the table itself scrolls sideways past that point rather
-       than the popover overflowing the viewport. */
     .dataGuidePopover {
       width: 620px;
       max-width: calc(100vw - 32px);
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      color: var(--text-primary);
+      font-size: 13px;
     }
-
     .dataGuideIntro {
       margin: 0 0 10px;
       color: var(--text-secondary);
-      font-size: 11px;
-      line-height: 1.4;
     }
-
     .dataGuideTableWrap {
       overflow-x: auto;
     }
-
     .dataGuideTable {
-      border-collapse: collapse;
-      /* Fixed rather than the browser's default auto layout, so the
-         <colgroup> percentages renderDataGuideTable writes are actually
-         honored - auto sizing is what used to make the five WFD band
-         columns different widths (each sized to its own widest cell)
-         instead of all matching each other. */
       table-layout: fixed;
       width: 100%;
-      font-size: 11px;
+      border-collapse: collapse;
+      font-size: 12px;
     }
-
     .dataGuideTable th,
     .dataGuideTable td {
       padding: 5px 8px;
-      text-align: left;
       white-space: nowrap;
       border-bottom: 1px solid var(--border);
+      text-align: left;
     }
-
     .dataGuideTable th {
-      font-weight: bold;
       color: var(--text-secondary);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
+      font-weight: 600;
     }
-
-    /* Overrides the blanket nowrap above just for the five WFD band
-       headers (Low/Slightly Elevated/Elevated/High/Very High) - now that
-       table-layout:fixed holds all five to the same width (see
-       .dataGuideTable), "Slightly Elevated" is normally the one too long
-       to fit that width on one line, and wraps onto a second rather than
-       forcing the column wider than the others.
-
-       Scoped as ".dataGuideTable th.dataGuideBandHeader", NOT bare
-       ".dataGuideBandHeader" (an earlier pass here got this wrong) -
-       ".dataGuideTable th, .dataGuideTable td" above is one class plus
-       one element, which beats a bare single-class selector on
-       specificity regardless of source order, so a plain
-       ".dataGuideBandHeader { white-space: normal }" rule never actually
-       overrode that block's white-space:nowrap at all: the header text
-       silently stayed on one line and just overflowed its fixed-width
-       column into the next one, which is exactly the overlap this was
-       supposed to fix. Matching that selector's own specificity here
-       (class+element) is what makes the override actually win.
-
-       text-align:center + the swatch stacked above the label (see
-       .dataGuideBandHeader .dataGuideSwatch/.dataGuideBandHeaderText)
-       rather than inline before it, so the column's full width is
-       available to the label text on however many lines it wraps to.
-       word-break is a last-resort safety net, not the primary fix - for
-       a band label that's a single word longer than its column. */
     .dataGuideTable th.dataGuideBandHeader {
-      text-align: center;
       white-space: normal;
       word-break: break-word;
-      line-height: 1.3;
       padding-left: 4px;
       padding-right: 4px;
+      text-align: center;
     }
-
     .dataGuideTable th.dataGuideBandHeader .dataGuideSwatch {
       display: block;
       margin: 0 auto 4px;
     }
-
     .dataGuideBandHeaderText {
       display: block;
     }
-
-    .dataGuideMetric {
-      font-weight: bold;
-      color: var(--text-primary);
-    }
-
-    /* Chemical notation, e.g. "(PO4)" - alongside .dataGuideMetric's
-       label rather than replacing it, so a determinand with no notation
-       (turbidity/conductivity/temperature) still reads exactly the same
-       as before. Not bold like the label itself, and muted rather than
-       the primary text color, so it reads as an annotation rather than
-       being mistaken for part of the name. */
-    .dataGuideNotation {
-      font-weight: normal;
-      color: var(--text-muted);
-    }
-
-    /* Inline "i" info button living inside a .dataGuideMetric cell (see
-       renderDataGuideTable/setupNestedInfoPopover) - position:relative
-       purely so .dataGuideMetricInfoPopover below has something to
-       anchor its position:absolute against; everything else about this
-       wrapper is just "sit inline with the label text". */
     .dataGuideMetricInfoWrap {
       position: relative;
       display: inline-block;
       margin-left: 4px;
       vertical-align: middle;
     }
-
     .dataGuideMetricInfoBtn {
-      appearance: none;
-      border: none;
-      background: none;
       padding: 0;
       cursor: pointer;
       display: inline-flex;
       vertical-align: middle;
+      background: none;
+      border: none;
+      color: var(--text-muted);
     }
-
-    /* Same floating-card language as .whatsNewPopover (surface/border/
-       shadow), just narrower and without that one's own list/header
-       styling, since this is one short paragraph rather than a list of
-       updates. Reuses .whatsNewCloseBtn as-is for its own close (&times;)
-       button rather than a second near-identical style. z-index/position
-       matter more here than for the top-level popovers: this one has to
-       clear whichever table rows sit below the Orthophosphate row inside
-       the same scrollable Data guide popover. */
+    .dataGuideMetricInfoBtn:hover {
+      color: var(--accent);
+    }
     .dataGuideMetricInfoPopover {
       position: absolute;
       top: calc(100% + 6px);
@@ -571,123 +404,153 @@
       z-index: 10;
       width: 260px;
       max-width: calc(100vw - 64px);
+      padding: 12px 14px 10px;
+      white-space: normal;
       background: var(--surface-1);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-      padding: 12px 14px 10px;
-      color: var(--text-primary);
-      font-size: 11px;
-      font-weight: normal;
-      line-height: 1.45;
-      white-space: normal;
-      text-transform: none;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      color: var(--text-secondary);
+      font-size: 12px;
     }
-
     .dataGuideMetricInfoPopover p {
       margin: 0;
       padding-right: 14px;
     }
-
+    .dataGuideMetric {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    .dataGuideNotation {
+      color: var(--text-muted);
+      font-weight: normal;
+    }
     .dataGuideUnit {
       color: var(--text-muted);
     }
-
-    /* Small colored square before each band's column header - the same
-       WFD_BAND_STYLE color used to tint that band's own cells below it
-       and everywhere else this app shows these five bands (map rings,
-       stat boxes, chart background bands). */
     .dataGuideSwatch {
       display: inline-block;
       width: 8px;
       height: 8px;
-      border-radius: 2px;
       margin-right: 4px;
+      border-radius: 2px;
     }
-
-    /* Invisible stand-in for a .topBarLabel, used only above the theme
-       toggle button - which has no real label of its own - so that with
-       #topBar now top-aligned, the button still starts at the same height
-       as every other group's control instead of sitting a label's-height
-       higher than the rest. */
     .topBarLabelSpacer {
       visibility: hidden;
     }
-
-    /* Pushes whichever group carries it (just the theme toggle, currently)
-       all the way to the row's right edge, with every other group packed
-       to the left in their normal source order. */
     .topBarRight {
       margin-left: auto;
     }
-
-    /* Sits inline with the date inputs here (see the markup) rather than
-       on its own line below them, to keep the whole group to one row. */
     #topBar .dateRangeClearBtn {
       margin-top: 0;
     }
 
-    /* --- Left sidebar: now given over entirely to the contextual layers
-       panel, which is the one expected to keep growing (more reference
-       layers, more classification pickers). The water quality metric
-       picker that used to share this space moved onto the map itself
-       (see .mapMetricPicker further down) so it never has to compete
-       with contextual layers for room. Same width as the details panel
-       on the right, so the map sits evenly between two matched side
-       panels. --- */
+    /* --- Buttons (generic) --- */
+    .themeToggleBtn,
+    .imageryToggleBtn,
+    .scorecardsDeselectBtn,
+    .dateRangeClearBtn,
+    .datePresetBtn,
+    .subToggleBtn,
+    .surveyNavBtn,
+    .lightboxNav,
+    .scorecardsPanelDownloadBtn,
+    .leagueSelectionBar button,
+    .chartFitToDataBtn,
+    .mapMetricPickerToggle,
+    .whatsNewCloseBtn,
+    .stormPopupCloseBtn,
+    .lightboxClose,
+    .scorecardsPanelClose {
+      background: var(--surface-2);
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+    }
+    .themeToggleBtn:hover,
+    .imageryToggleBtn:hover,
+    .scorecardsDeselectBtn:hover,
+    .dateRangeClearBtn:hover,
+    .datePresetBtn:hover,
+    .subToggleBtn:hover:not(:disabled),
+    .surveyNavBtn:hover:not(:disabled),
+    .lightboxNav:hover:not(:disabled),
+    .scorecardsPanelDownloadBtn:hover:not(:disabled),
+    .leagueSelectionBar button:hover,
+    .chartFitToDataBtn:hover,
+    .mapMetricPickerToggle:hover,
+    .whatsNewCloseBtn:hover,
+    .stormPopupCloseBtn:hover,
+    .lightboxClose:hover,
+    .scorecardsPanelClose:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .datePresetBtn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--text-inverse);
+    }
+    .subToggleBtn:disabled,
+    .surveyNavBtn:disabled,
+    .lightboxNav:disabled,
+    .scorecardsPanelDownloadBtn:disabled {
+      opacity: 0.4;
+    }
+    .imageryToggleBtn {
+      border-radius: 50%;
+    }
+    .imageryToggleBtn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--text-inverse);
+    }
+
+    .whatsNewBtn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px 3px 6px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .whatsNewIcon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+
+    /* --- Sidebar / form controls --- */
     #sidebar {
       width: 320px;
       flex-shrink: 0;
       padding: 16px;
-      background: var(--surface-1);
-      border: 1px solid var(--border);
       box-sizing: border-box;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
     }
-
-    /* --- Light/dark toggle, top-right of the sidebar. Shows the mode
-       you'd switch TO (sun = "go light" while dark, moon = "go dark" while
-       light), which is the common convention, but keeps a text label too
-       since an icon alone is easy to misread - see setTheme() for what
-       flipping it actually changes (page colors, the ArcGIS widget theme,
-       the basemap, and every hand-drawn map/chart color). --- */
     .themeToggleBtn {
       flex-shrink: 0;
       display: flex;
       align-items: center;
       gap: 5px;
       padding: 5px 9px;
-      background: var(--surface-2);
-      border: 1px solid var(--border-strong);
-      border-radius: 14px;
-      color: var(--text-secondary);
-      font-size: 12px;
       cursor: pointer;
       white-space: nowrap;
+      border-radius: var(--radius-pill);
     }
-
-    .themeToggleBtn:hover {
-      border-color: var(--accent);
-      color: var(--text-primary);
-    }
-
     #themeToggleIcon {
       font-size: 13px;
       line-height: 1;
     }
-
-    /* Imagery basemap button - added to the map itself via view.ui.add
-       (top-right), not this stylesheet's markup (see the script). Esri's
-       own esri-widget/esri-interactive classes stay on the element for
-       their built-in hover/focus/keyboard behaviour, but fully re-skinned
-       here (background/border !important to beat Esri's own, more
-       specific rules for them - same reason .active already needed it
-       below) into a small round pill matching this dashboard's other
-       controls (.themeToggleBtn/.whatsNewBtn) rather than Esri's square
-       widget-button look, so it reads as part of the app instead of a
-       bolted-on map-library control. */
     .imageryToggleBtn {
       display: flex;
       align-items: center;
@@ -695,29 +558,7 @@
       width: 34px;
       height: 34px;
       box-sizing: border-box;
-      font-size: 15px;
-      background: var(--surface-2) !important;
-      border: 1px solid var(--border-strong) !important;
-      border-radius: 50%;
-      box-shadow: var(--card-shadow);
-      transition: border-color 0.15s ease;
     }
-
-    .imageryToggleBtn:hover {
-      border-color: var(--accent) !important;
-    }
-
-    .imageryToggleBtn.active {
-      background: var(--accent) !important;
-      border-color: var(--accent) !important;
-    }
-
-    /* Deselect-waterbody button, bottom-right of the Scorecards map (see
-       scorecardsDeselectBtn) - same free styling story as imageryToggleBtn
-       above (box/border/hover/theming from esri-widget--button/esri-widget),
-       but this one carries a text label rather than a single icon glyph, so
-       unlike imageryToggleBtn it can't stay at that class's fixed
-       icon-button width/height - widen it out and let the label breathe. */
     .scorecardsDeselectBtn {
       display: flex;
       align-items: center;
@@ -725,432 +566,305 @@
       width: auto;
       height: auto;
       padding: 6px 12px;
-      font-size: 13px;
-      font-family: inherit;
       white-space: nowrap;
     }
-
     #sidebar label {
       display: block;
       margin-top: 14px;
       margin-bottom: 4px;
-      font-weight: bold;
-      font-size: 13px;
       color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 600;
     }
-
+    #orgFilter,
+    .dateRangeRow input[type="date"] {
+      background: var(--surface-2);
+      color: var(--text-primary);
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-xs);
+      font-family: inherit;
+      font-size: 12px;
+    }
     #orgFilter {
       width: 100%;
       padding: 6px;
       box-sizing: border-box;
-      background: var(--surface-2);
-      color: var(--text-primary);
-      border: 1px solid var(--border-strong);
-      border-radius: 4px;
     }
-
-    /* --- Metric list: the single selector that drives both the map's
-       point symbology and the trend chart's plotted metric --- */
     .metricList {
       display: flex;
       flex-direction: column;
       gap: 2px;
       margin-top: 4px;
     }
-
     .metricItem {
+      /* This is a <button> (see renderMetricList), which browsers give a
+         native 3D/beveled appearance to by default - every other button
+         class in this file gets an explicit background+border in its own
+         rule that happens to override that, but this one only had color
+         set here, so the raw native chrome was showing through on every
+         row. appearance: none plus an explicit transparent background/no
+         border is what actually neutralizes it. */
+      appearance: none;
+      background: none;
+      border: none;
+      text-align: left;
       display: flex;
       align-items: center;
       gap: 8px;
       width: 100%;
       padding: 6px 8px;
-      border: 1px solid transparent;
-      border-radius: 4px;
-      background: none;
-      font-family: inherit;
-      font-size: 13px;
-      color: var(--text-secondary);
-      text-align: left;
       cursor: pointer;
       box-sizing: border-box;
+      border-radius: var(--radius-xs);
+      color: var(--text-secondary);
+      font-size: 12px;
     }
-
     .metricItem:hover {
       background: var(--surface-2);
-    }
-
-    .metricItem.active {
-      background: var(--surface-2);
-      border-color: var(--accent);
       color: var(--text-primary);
-      font-weight: bold;
     }
-
+    /* renderMetricList toggles "active" (mirroring .tabButton/.datePresetBtn
+       elsewhere), not "selected" - this rule never matched under that name.
+       Brand-tinted rather than the same plain --surface-2 as :hover, so the
+       one actually-selected determinand reads as clearly different from a
+       row you're just hovering over. */
+    .metricItem.active {
+      background: var(--accent-bg);
+      color: var(--accent);
+      font-weight: 600;
+    }
     .metricSwatch {
       width: 10px;
       height: 10px;
-      border-radius: 50%;
       flex-shrink: 0;
+      border-radius: 2px;
     }
-
     .metricEmpty {
-      font-size: 12px;
-      color: var(--text-muted);
       margin-top: 4px;
+      color: var(--text-muted);
+      font-size: 12px;
     }
-
-    /* Floating card added to the map view itself via view.ui.add(...,
-       "top-left") - Esri handles the actual corner placement, no
-       manual positioning needed. Same surface/border/shadow language as
-       .stormPopup, since it's the same idea (a small floating
-       info/control card over the map), just permanently visible rather
-       than opened on a click. */
     .mapMetricPicker {
       width: 220px;
       max-width: calc(100vw - 32px);
       max-height: 320px;
       overflow-y: auto;
-      background: var(--surface-1);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
       padding: 10px 12px 12px;
       box-sizing: border-box;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
     }
-
-    /* Replaces the old "#sidebar label" rule this label used to pick up
-       for free back when it lived in the sidebar - now that it's inside
-       its own floating card instead, it needs its own font/color rule. */
     .mapMetricPicker label {
       display: block;
       margin: 0 0 6px;
-      font-weight: bold;
-      font-size: 13px;
       color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 600;
     }
-
-    /* Holds the "Determinand" label and the minimise toggle side by side -
-       .mapMetricPickerHeader label overrides the block/margin rule above
-       (two classes + element beats one class + element, so this one
-       actually wins rather than silently losing the way an earlier pass
-       elsewhere in this file got bitten by the same kind of specificity
-       mismatch - see the Data guide band header CSS comment). The label
-       itself still carries the margin-bottom that used to separate it
-       from the list below; the header row just needs it to sit inline
-       with the button instead of as a block. */
     .mapMetricPickerHeader {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
     }
-
     .mapMetricPickerHeader label {
       margin: 0;
-      /* Collapsed, this can hold the selected metric's own name instead of
-         the plain "Determinand" (see updateMetricListLabel) - "Orthophosphate"
-         is long enough that it needs to shrink/truncate here rather than
-         push the toggle button out or wrap, especially at the narrower
-         mobile card width below. */
       flex: 1;
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-
-    /* Minimise/restore toggle - a plain chevron that rotates rather than
-       swapping glyphs, so there's only ever one icon to keep track of.
-       Pointing down (expanded, the default) or rotated to point sideways
-       (collapsed - see .mapMetricPicker.collapsed below). */
     .mapMetricPickerToggle {
-      appearance: none;
-      border: none;
-      background: none;
       padding: 2px;
       margin: 0 0 6px;
       cursor: pointer;
-      color: var(--text-secondary);
-      font-size: 12px;
-      line-height: 1;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      transition: transform 0.15s ease;
     }
-
-    .mapMetricPickerToggle:hover {
-      color: var(--accent);
-    }
-
-    /* Collapsed state - just hides the list/empty-state below the header
-       (both are #metricList's own content, so hiding that one element
-       covers either) and rotates the chevron to point sideways rather
-       than down, matching a normal disclosure-triangle convention.
-       Nothing needs doing to .mapMetricPicker itself: with the list gone,
-       the card naturally shrinks to just its header's height. */
     .mapMetricPicker.collapsed .metricList {
       display: none;
     }
-
     .mapMetricPicker.collapsed .mapMetricPickerToggle {
       transform: rotate(-90deg);
     }
 
-    /* --- Date range: narrows both the trend chart and the Recent surveys
-       carousel down to surveys within the picked range. Same
-       visibility rule as the metric picker above (Map tab + an
-       organisation selected) since both downstream views are Map-tab-only. --- */
+    /* --- Date range --- */
     .dateRangeRow {
       display: flex;
       align-items: center;
       gap: 6px;
     }
-
     .dateRangeRow input[type="date"] {
       flex: 1;
       min-width: 0;
       padding: 6px;
       box-sizing: border-box;
-      background: var(--surface-2);
-      color: var(--text-primary);
-      border: 1px solid var(--border-strong);
-      border-radius: 4px;
-      font-family: inherit;
-      font-size: 12px;
-      /* Without this the native date-picker icon renders dark-on-dark and
-         is nearly invisible against --surface-2. */
-      color-scheme: dark;
     }
-
     .dateRangeSep {
+      flex-shrink: 0;
       color: var(--text-muted);
       font-size: 12px;
-      flex-shrink: 0;
     }
-
     .dateRangeClearBtn {
       margin-top: 6px;
-      background: none;
-      border: 1px solid var(--border-strong);
-      color: var(--text-secondary);
-      border-radius: 4px;
       padding: 4px 10px;
-      font-size: 11px;
       cursor: pointer;
+      font-size: 11px;
     }
-
-    .dateRangeClearBtn:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    /* --- Date range presets: one click sets both date inputs to a
-       rolling window ending today (see applyDatePreset) rather than
-       requiring the two pickers to be set by hand. --- */
     .dateRangePresets {
       display: flex;
       gap: 6px;
       margin-top: 6px;
     }
-
     .datePresetBtn {
-      background: none;
-      border: 1px solid var(--border-strong);
-      color: var(--text-secondary);
-      border-radius: 4px;
       padding: 4px 8px;
-      font-size: 11px;
       cursor: pointer;
       white-space: nowrap;
+      font-size: 11px;
     }
-
-    .datePresetBtn:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    /* Highlights whichever preset (if any) exactly matches the two date
-       inputs' current values - see updateDatePresetHighlight. Cleared the
-       moment either input is hand-edited to something else. */
-    .datePresetBtn.active {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
-
-    /* A boxed button that only makes sense once the checkbox/toggle above
-       it is switched on - indented to read as a sub-option rather than a
-       peer layer toggle. Used for "Show flow direction" under Open River
-       Network and "Show only discharging / recent" under Storm Overflows. */
     .subControlRow {
       margin-top: 6px;
       margin-left: 20px;
     }
-
     .subToggleBtn {
-      background: none;
-      border: 1px solid var(--border-strong);
-      color: var(--text-secondary);
-      border-radius: 4px;
       padding: 4px 10px;
-      font-size: 11px;
       cursor: pointer;
+      font-size: 11px;
     }
-
-    .subToggleBtn:hover:not(:disabled) {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    .subToggleBtn.active {
-      background-color: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
-
     .subToggleBtn:disabled {
-      opacity: 0.45;
       cursor: not-allowed;
     }
-
-    /* Row of mutually-exclusive WFD classification buttons, underneath the
-       WFD Waterbody Classification checkbox - same subToggleBtn box style
-       and subControlRow indent as "Show flow direction"/"Show only
-       discharging" above, just three buttons side by side acting as a
-       group (see wfdClassButtons) instead of one independent on/off
-       toggle. */
+    /* wfdClassBtn (Ecological/Ammonia/Orthophosphate), flowDirectionToggle
+       ("Show flow direction") and stormOverflowFilterBtn ("Show only
+       discharging / recent") all toggle this same "active" class (and
+       reflect it in aria-pressed too, matched here as a belt-and-braces
+       fallback) - but nothing lit it up before now. Same brand-fill
+       treatment as .tabButton.active/.datePresetBtn.active elsewhere. */
+    .subToggleBtn.active,
+    .subToggleBtn[aria-pressed="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--text-inverse);
+    }
     .subControlRow.wfdClassRow {
       display: flex;
       gap: 6px;
       flex-wrap: wrap;
     }
 
-    /* --- Storm overflow popup: a self-built floating panel rather than
-       Esri's own Popup widget, whose own chrome turned out impossible to
-       theme reliably (its DOM didn't respond to any CSS override tried,
-       consistent with it being sealed off in a shadow root). Built
-       entirely from this app's own --su */
+    /* --- Storm overflow popup --- */
     .stormPopup {
       position: absolute;
       z-index: 20;
       width: 280px;
+      padding: 14px 16px 12px;
       background: var(--surface-1);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-      padding: 14px 16px 12px;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
       color: var(--text-primary);
-      font-size: 13px;
-      line-height: 1.4;
     }
-
     .stormPopup[hidden] {
       display: none;
     }
-
-    /* A rotated square, half of it clipped by the card's own edge, giving
-       a diamond "pointer" tip - two of its four borders are removed so
-       only the two facing outward read as an outline, a standard CSS
-       speech-bubble-arrow technique. */
     .stormPopupArrow {
       position: absolute;
       width: 12px;
       height: 12px;
-      background: var(--surface-1);
       left: 50%;
       margin-left: -6px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
     }
-
     .stormPopup--below .stormPopupArrow {
       top: -6px;
-      border-left: 1px solid var(--border);
-      border-top: 1px solid var(--border);
       transform: rotate(45deg);
+      border-right: none;
+      border-bottom: none;
     }
-
     .stormPopup--above .stormPopupArrow {
       bottom: -6px;
-      border-right: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
       transform: rotate(45deg);
+      border-left: none;
+      border-top: none;
     }
-
     .stormPopupCloseBtn {
       position: absolute;
       top: 10px;
       right: 10px;
-      appearance: none;
-      border: none;
-      background: none;
       cursor: pointer;
-      color: var(--text-muted);
-      font-size: 18px;
-      line-height: 1;
       padding: 2px;
     }
-
-    .stormPopupCloseBtn:hover {
-      color: var(--text-primary);
-    }
-
     .stormPopupHeader {
       display: flex;
       align-items: flex-start;
       gap: 8px;
       padding-right: 20px;
     }
-
     .stormPopupGlyph {
-      font-size: 20px;
-      line-height: 1;
       flex: 0 0 auto;
       margin-top: 1px;
+      color: var(--text-secondary);
     }
-
     .stormPopupTitleBlock {
       min-width: 0;
     }
-
-    .stormPopupCompany {
-      font-size: 15px;
-      font-weight: 700;
-    }
-
     .stormPopupId {
-      color: var(--text-secondary);
-      font-size: 12px;
       margin-top: 2px;
+      color: var(--text-muted);
+      font-size: 12px;
     }
-
+    .stormPopupCompany {
+      color: var(--text-primary);
+      font-weight: 700;
+      font-size: 15px;
+    }
     .stormPopupFeeds {
-      color: var(--accent);
-      font-style: italic;
-      font-size: 12.5px;
       margin-top: 8px;
+      color: var(--accent);
+      font-size: 12.5px;
+      font-style: italic;
     }
-
     .stormPopupFeeds strong {
       font-weight: 700;
     }
-
+    .stormPopupTimeLabel {
+      color: var(--text-muted);
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .stormPopupTimeValue {
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .stormPopupDuration {
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+    .stormPopupNoActivity {
+      color: var(--text-secondary);
+      font-size: 12.5px;
+    }
     .stormPopupDivider {
+      margin: 10px 0;
       border: none;
       border-top: 1px solid var(--border);
-      margin: 10px 0;
     }
-
     .stormPopupCard {
       display: flex;
       gap: 12px;
       align-items: flex-start;
-      border: 1px solid var(--border);
-      border-radius: 10px;
       padding: 12px;
       background: var(--surface-2);
+      border-radius: var(--radius-sm);
     }
-
     .stormPopupDateBadge {
       display: flex;
       flex-direction: column;
@@ -1159,30 +873,26 @@
       flex: 0 0 auto;
       width: 52px;
       padding: 6px 4px;
-      border-radius: 8px;
-      line-height: 1.15;
+      border-radius: var(--radius-sm);
+      background: var(--status-neutral-bg);
+      color: var(--status-neutral);
     }
-
     .stormPopupDateBadgeMonth,
     .stormPopupDateBadgeYear {
       display: block;
       font-size: 10px;
-      font-weight: 600;
       text-transform: uppercase;
     }
-
     .stormPopupDateBadgeDay {
       display: block;
-      font-size: 20px;
-      font-weight: 700;
       margin: 1px 0;
+      font-size: 18px;
+      font-weight: 600;
     }
-
     .stormPopupDetails {
       flex: 1 1 auto;
       min-width: 0;
     }
-
     .stormPopupHeadlineRow {
       display: flex;
       align-items: center;
@@ -1190,33 +900,28 @@
       gap: 8px;
       margin-bottom: 8px;
     }
-
     .stormPopupHeadline {
-      font-weight: 700;
-      font-size: 13.5px;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-primary);
     }
-
     .stormPopupHeadlineGlyph {
       margin-left: 3px;
     }
-
-    /* The small dot before "ACTIVE" is a ::before with a solid circle in
-       currentColor, so it always matches the pill's own (category-based)
-       text colour without a separate colour rule of its own. */
     .stormPopupActivePill {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      font-size: 10.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
       padding: 3px 9px;
-      border-radius: 999px;
       white-space: nowrap;
       flex: 0 0 auto;
+      border-radius: var(--radius-pill);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      background: var(--status-neutral-bg);
+      color: var(--status-neutral);
     }
-
     .stormPopupActivePill::before {
       content: "";
       width: 6px;
@@ -1224,180 +929,110 @@
       border-radius: 50%;
       background: currentColor;
     }
-
     .stormPopupTimes {
       display: flex;
       gap: 20px;
       margin-bottom: 6px;
+      font-size: 12px;
     }
-
     .stormPopupTimeCol {
       display: flex;
       flex-direction: column;
-    }
-
-    .stormPopupTimeLabel {
-      font-size: 10.5px;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      color: var(--text-muted);
-    }
-
-    .stormPopupTimeValue {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-
-    .stormPopupDuration {
-      font-size: 12px;
       color: var(--text-secondary);
     }
-
-    .stormPopupNoActivity {
-      font-size: 12.5px;
-      color: var(--text-secondary);
-    }
-
     .stormPopupUpdated {
       margin-top: 10px;
-      font-size: 11px;
       color: var(--text-muted);
+      font-size: 11px;
     }
 
-    /* One accent colour per status category - shared between the date
-       badge fill, the headline text and (spilling only) the ACTIVE pill,
-       so all three reinforce each other at a glance, same visual-priority
-       idea as the map glyphs themselves. */
+    /* Storm status variants - discharge status colours, one fg/bg pair per
+       category (see the --status-* tokens up top), independent of --accent
+       since these encode discharge status, not app chrome. */
     .stormPopupCard--spilling .stormPopupDateBadge,
-    .stormPopupCard--spilling .stormPopupActivePill { background: var(--storm-spilling-bg); color: var(--storm-spilling); }
-    .stormPopupCard--spilling .stormPopupHeadline { color: var(--storm-spilling); }
+    .stormPopupCard--spilling .stormPopupActivePill { background: var(--status-danger-bg); color: var(--status-danger); }
+    .stormPopupCard--spilling .stormPopupHeadline { color: var(--status-danger); }
 
-    .stormPopupCard--recent .stormPopupDateBadge { background: var(--storm-recent-bg); color: var(--storm-recent); }
-    .stormPopupCard--recent .stormPopupHeadline { color: var(--storm-recent); }
+    .stormPopupCard--recent .stormPopupDateBadge,
+    .stormPopupCard--recent .stormPopupActivePill { background: var(--status-warning-bg); color: var(--status-warning); }
+    .stormPopupCard--recent .stormPopupHeadline { color: var(--status-warning); }
 
-    .stormPopupCard--notspilling .stormPopupDateBadge { background: var(--storm-notspilling-bg); color: var(--storm-notspilling); }
-    .stormPopupCard--notspilling .stormPopupHeadline { color: var(--storm-notspilling); }
+    .stormPopupCard--notspilling .stormPopupDateBadge,
+    .stormPopupCard--notspilling .stormPopupActivePill { background: var(--status-success-bg); color: var(--status-success); }
+    .stormPopupCard--notspilling .stormPopupHeadline { color: var(--status-success); }
 
-    .stormPopupCard--offline .stormPopupDateBadge { background: var(--storm-offline-bg); color: var(--storm-offline); }
-    .stormPopupCard--offline .stormPopupHeadline { color: var(--storm-offline); }
+    .stormPopupCard--offline .stormPopupDateBadge,
+    .stormPopupCard--offline .stormPopupActivePill { background: var(--status-neutral-bg); color: var(--status-neutral); }
+    .stormPopupCard--offline .stormPopupHeadline { color: var(--status-neutral); }
 
+    /* --- Checkboxes / tabs --- */
     .checkboxRow {
       display: flex;
       align-items: center;
       gap: 8px;
       margin-top: 14px;
-      font-size: 13px;
-      color: var(--text-secondary);
       cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 12px;
     }
-
     .checkboxRow input[type="checkbox"] {
       margin: 0;
       cursor: pointer;
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
     }
-
-    /* --- Applied to a .checkboxRow (see updateScaleGatedLayerAvailability)
-       when its layer's own minScale puts it out of reach at the current
-       zoom - greyed out and inert rather than just carrying an explanatory
-       tooltip, so it's obvious at a glance rather than only on hover. --- */
     .checkboxRow.scaleDisabled {
-      opacity: 0.45;
       cursor: not-allowed;
+      opacity: 0.5;
     }
-
     .checkboxRow.scaleDisabled input[type="checkbox"] {
       cursor: not-allowed;
     }
-
-    /* --- Groups contextual layers that are mutually exclusive (see
-       registerExclusiveLayerGroup) - switching one on switches any
-       other one in the same group off, so the group reads as a single
-       choice of background classification rather than a set of
-       independent toggles. Purely visual; the exclusivity itself is
-       enforced in JS. A thin left accent border rather than a full box,
-       consistent with how .subControlRow already indents rather than
-       boxes its own sub-choices - just enough to read as one nested
-       unit within #contextualLayersListTab. More layers are expected to
-       join this same group later (see EXCLUSIVE_LAYER_GROUPS), so
-       nothing here is sized to exactly two rows. --- */
     .exclusiveLayerGroup {
       margin-top: 14px;
       padding-left: 10px;
       border-left: 2px solid var(--border);
     }
-
     .exclusiveLayerGroup .checkboxRow:first-of-type {
       margin-top: 0;
     }
-
     .exclusiveLayerGroupLabel {
       margin: 0 0 4px;
-      font-size: 11px;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
       color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
     }
-
-    /* --- Tabs: switch the main content between the map and the league table --- */
     #tabBar {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 4px;
       margin-top: 14px;
     }
-
     .tabButton {
-      flex: 1;
       padding: 6px 4px;
-      font-size: 12px;
-      font-weight: bold;
-      border: 1px solid var(--border-strong);
-      background: var(--surface-2);
-      color: var(--text-secondary);
-      border-radius: 4px;
       cursor: pointer;
+      background: none;
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 12px;
+      text-align: center;
     }
-
+    .tabButton:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
     .tabButton.active {
       background: var(--accent);
       border-color: var(--accent);
-      color: #fff;
+      color: var(--text-inverse);
     }
-
-    /* --- PROTOTYPE GATE (this build only): the Scorecards tab is still
-       a prototype, so this build hides its entry point from ordinary
-       users rather than shipping a half-finished feature to them. This
-       is the ONLY change between this file and the full dev copy
-       (national_river_survey_dashboard_v2.html) - nothing about the
-       Scorecards tab's own HTML/JS/data underneath was touched, so
-       bringing it back for everyone is just deleting this one rule.
-       The remaining three tabs' flex:1 sizing (see .tabButton above)
-       reflows to fill the bar evenly on its own once this one is gone
-       from layout, so no other CSS needs to change either.
-       Note this only hides the button in the UI - it doesn't lock the
-       tab away from someone deliberately poking at the page's own code,
-       so don't rely on it for anything that needs to be truly private. */
     .tabButton[data-tab="scorecards"] {
       display: none;
     }
-
-    /* --- First-run guidance: a pulsing glow on the org dropdown, the one
-       thing that actually does anything until an organisation is picked -
-       a new visitor's eye goes there first rather than having to stumble
-       onto it. Stops on its own once an organisation is selected (see
-       dismissOnboarding()). ---  */
-    @keyframes onboardingPulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(57, 135, 229, 0.5); }
-      50% { box-shadow: 0 0 0 5px rgba(57, 135, 229, 0); }
-    }
-
-    .onboardingHighlight {
-      animation: onboardingPulse 1.8s ease-in-out infinite;
-    }
-
-    /* --- Center: the map column (map + chart panel stacked), with the
-       details panel as a full-height sidebar alongside it --- */
+    
+    /* --- Map area --- */
     #mapArea {
       display: flex;
       flex-direction: row;
@@ -1405,61 +1040,28 @@
       min-width: 0;
       gap: 12px;
     }
-
-    /* The map + chart panel, stacked - only this column's width is spanned
-       by the chart, not the details panel beside it. */
     #mapColumn {
       display: flex;
       flex-direction: column;
       flex-grow: 1;
       min-width: 0;
       gap: 12px;
-      /* Anchors #stormPopup (a plain sibling of #viewDiv, not injected
-         inside Esri's own view container) - view.toScreen() returns
-         coordinates relative to the view container's top-left, which
-         coincides with #mapColumn's own top-left since #viewDiv is its
-         first child with no padding/border between them, so those
-         coordinates can be used as #stormPopup's left/top directly. The
-         gap above only adds space AFTER #viewDiv (before #chartPanel),
-         so it doesn't disturb this. */
       position: relative;
-      /* Clicking/dragging on the map (panning, clicking a feature) is a
-         mousedown+mouseup over empty space from the browser's point of
-         view, which it interprets as a text-selection drag and paints a
-         blue selection highlight across the map (and the chart panel
-         below it) unless selection is explicitly turned off here. */
       user-select: none;
       -webkit-user-select: none;
       -moz-user-select: none;
     }
-
-    /* #viewDiv intentionally does NOT use .dashboardCard/border like its
-       sibling panels - #stormPopup (see #mapColumn above) relies on
-       #viewDiv having no real border or padding, which would shift its
-       content box relative to #mapColumn's top-left and throw off that
-       pixel-perfect positioning. The same rounded/elevated look is
-       reached here without either: overflow:hidden clips the map itself
-       to the rounded corners, and a 1px inset "border" is faked as part
-       of the box-shadow instead of a real border. */
     #viewDiv {
       flex-grow: 1;
       min-height: 0;
-      border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 0 0 1px var(--border), var(--card-shadow);
-      /* Fallback while basemap tiles load, so it's dark from the first
-         paint rather than flashing white. */
-      background: var(--surface-1);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 0 0 1px var(--border), var(--shadow-sm);
     }
 
-    /* The ArcGIS view sets tabindex on its container for keyboard
-       accessibility, so clicking a point/organisation to select it also
-       gives the map focus. #viewDiv itself never shows a browser outline,
-       but the API draws its own focus ring as a ::after pseudo-element on
-       an inner .esri-view-surface div it creates - so the fix has to
-       target that element, not #viewDiv. The exact class differs by API
-       version (--touch-none pre-5.0, plain surface at 5.0+), so both are
-       covered here. */
+    /* Suppress the browser's own focus outline on the map container and
+       the ArcGIS API's own focus ring on the inner surface div it creates
+       (see original dashboard for the same fix). */
     #viewDiv:focus,
     #viewDiv:focus-visible {
       outline: none;
@@ -1470,428 +1072,363 @@
       outline: none !important;
     }
 
-    /* --- Right panel: location details - a flex row's children stretch to
-       fill its height by default, so this runs the full height of the map
-       area, chart panel included, not just alongside the map itself. --- */
+    /* --- Details panel --- */
     #detailsPanel {
       width: 320px;
       flex-shrink: 0;
       padding: 16px;
-      background: var(--surface-1);
-      border: 1px solid var(--border);
       box-sizing: border-box;
       overflow-y: auto;
-      color: var(--text-primary);
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
     }
-
     #detailsPanel h2 {
-      font-size: 16px;
       margin-top: 0;
       margin-bottom: 2px;
-      color: var(--text-primary);
+      font-size: 16px;
     }
-
     #detailsPanel .orgName {
-      color: var(--text-secondary);
-      font-size: 13px;
       margin-bottom: 12px;
+      color: var(--text-secondary);
+      font-size: 12px;
     }
-
     #detailsPlaceholder {
       color: var(--text-muted);
       font-size: 13px;
     }
-
     .statGrid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
       margin-bottom: 16px;
     }
-
     .statBox {
-      background: var(--surface-2);
-      border-radius: 4px;
+      height: 60px;
       padding: 8px;
+      background: var(--surface-2);
+      border-radius: var(--radius-sm);
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
     }
-
-    .statBox .value {
-      font-size: 18px;
-      font-weight: bold;
+    .statValueRow {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      min-width: 0;
       color: var(--text-primary);
     }
-
-    .statBox .label {
-      font-size: 11px;
-      color: var(--text-secondary);
+    .statBox .value {
+      color: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
     }
-
+    .statUnit {
+      color: inherit;
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: none;
+      white-space: nowrap;
+    }
+    .statBox .label {
+      color: var(--text-muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      line-height: 1.25;
+      margin-top: 2px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
     .wildlifeTags {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
       margin-bottom: 16px;
     }
-
+    /* Green (success) - a wildlife sighting is a nice find. */
     .wildlifeTag {
-      background: rgba(25, 158, 112, 0.18);
-      color: #6fd7a8;
-      border-radius: 12px;
       padding: 3px 10px;
+      background: var(--status-success-bg);
+      color: var(--status-success);
+      border-radius: var(--radius-pill);
       font-size: 12px;
     }
-
-    /* A warning red/orange rather than wildlifeTag's green - an invasive
-       species sighting is a caution, not a nice find, so it shouldn't
-       read the same as a wildlife spot at a glance. */
+    /* Red (danger), not wildlifeTag's green - an invasive species sighting
+       is a caution, not a nice find, so it shouldn't read the same as a
+       wildlife spot at a glance. */
     .invasiveTag {
-      background: rgba(198, 40, 40, 0.18);
-      color: #ff8a80;
-      border-radius: 12px;
       padding: 3px 10px;
+      background: var(--status-danger-bg);
+      color: var(--status-danger);
+      border-radius: var(--radius-pill);
       font-size: 12px;
     }
-
-    #detailsPanel h3 {
-      font-size: 13px;
-      border-top: 1px solid var(--border);
-      padding-top: 12px;
-      margin-bottom: 8px;
-      color: var(--text-primary);
-    }
-
-    /* --- Contextual layers panel: houses reference-layer toggles (the WFD
-       catchments layer today, more to follow) - now the sole occupant of
-       #sidebar (see the comment above #sidebar), so it no longer needs
-       margin-top: auto or a separator to hold its own "bottom half"
-       section under anything else. --- */
+    #detailsPanel h3,
     #contextualLayersPanel h3 {
       font-size: 13px;
-      margin: 0 0 4px;
-      color: var(--text-primary);
+      color: var(--text-secondary);
     }
-
+    #detailsPanel h3 {
+      padding-top: 12px;
+      margin-bottom: 8px;
+      border-top: 1px solid var(--border);
+    }
+    #contextualLayersPanel h3 {
+      margin: 0 0 4px;
+    }
     #contextualLayersPanel .checkboxRow {
       margin-top: 10px;
     }
-
-    /* --- Tabs within the contextual layers panel (Layers / Legend) - a
-       separate class from the top-level .tabButton/#tabBar (Map / Site
-       league table) further up, even though it looks the same, because the
-       top-level tab JS selects .tabButton globally: sharing the class
-       would pull these buttons into that logic and vice versa. --- */
     .contextualTabBar {
       display: flex;
       gap: 4px;
       margin-top: 10px;
     }
-
     .contextualTabButton {
       flex: 1;
       padding: 6px 4px;
-      font-size: 12px;
-      font-weight: bold;
-      border: 1px solid var(--border-strong);
-      background: var(--surface-2);
-      color: var(--text-secondary);
-      border-radius: 4px;
       cursor: pointer;
+      background: none;
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 11px;
     }
-
+    .contextualTabButton:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
     .contextualTabButton.active {
       background: var(--accent);
       border-color: var(--accent);
-      color: #fff;
+      color: var(--text-inverse);
     }
-
     #contextualLayersListTab {
       margin-top: 4px;
     }
-
     #contextualLayersLegendTab {
       margin-top: 10px;
     }
-
     .contextualLegendEmpty {
-      font-size: 12px;
-      color: var(--text-secondary);
       margin: 0;
+      color: var(--text-muted);
+      font-size: 12px;
     }
-
-    /* Made transparent at every level for the same reason the map metric
-       picker card gets its own custom styling instead - the Esri Legend
-       widget takes over its container element directly, themed dark by
-       the esri/themes/dark stylesheet linked in <head>, which is close
-       to but not exactly this app's own dark surface and otherwise reads
-       as a faint mismatched box behind each legend entry. */
     #contextualLegend .esri-legend {
       max-width: 100%;
-      font-size: 12px;
     }
-
     #contextualLegend,
     #contextualLegend * {
       background: transparent !important;
       box-shadow: none !important;
     }
-
-    /* --- Recent surveys: a one-card-at-a-time carousel over the last 5
-       surveys (newest first) rather than a flat list, so there's room to
-       show each visit's full detail - weather, rainfall, clarity, and its
-       photos - without crowding the sidebar. --- */
     .surveyCarouselHeader {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 8px;
     }
-
     .surveyNavBtn {
       width: 26px;
       height: 26px;
-      border-radius: 4px;
-      border: 1px solid var(--border-strong);
-      background: var(--surface-2);
-      color: var(--text-primary);
-      font-size: 15px;
-      line-height: 1;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 0;
+      border-radius: 50%;
     }
-
-    .surveyNavBtn:hover:not(:disabled) {
-      background: var(--surface-3);
-    }
-
     .surveyNavBtn:disabled {
-      opacity: 0.35;
       cursor: default;
     }
-
-    .surveyCarouselPosition {
-      font-size: 11px;
-      color: var(--text-secondary);
-    }
-
     .surveyCard {
-      background: var(--surface-2);
-      border-radius: 6px;
       padding: 10px 12px;
-      font-size: 12px;
+      background: var(--surface-2);
+      border-radius: var(--radius-sm);
     }
-
     .surveyDate {
-      font-weight: bold;
-      font-size: 13px;
-      color: var(--text-primary);
       margin-bottom: 6px;
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 13px;
     }
-
     .weatherTags {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
       margin-bottom: 8px;
     }
-
+    /* Neutral/brand tint - weather conditions aren't good or bad, so they
+       don't get a status colour the way wildlife/invasive tags do. */
     .weatherTag {
-      background: rgba(57, 135, 229, 0.18);
-      color: #7fb8f5;
-      border-radius: 12px;
       padding: 3px 10px;
+      background: var(--accent-bg);
+      color: var(--accent);
+      border-radius: var(--radius-pill);
       font-size: 11px;
     }
-
     .surveyFieldGrid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px 10px;
       margin-bottom: 8px;
+      font-size: 12px;
     }
-
+    .surveyCarouselPosition {
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
     .surveyFieldLabel {
       display: block;
       color: var(--text-muted);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
+      font-size: 11px;
     }
-
     .surveyFieldValue {
       color: var(--text-primary);
     }
-
-    /* --- Water quality readings panel within a survey card - every metric
-       this survey actually recorded a value for (not a fixed subset),
-       color-swatched to match the same metric everywhere else (map,
-       sidebar list, chart). --- */
     .surveyMetrics {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px 10px;
       padding-top: 8px;
-      border-top: 1px solid var(--border);
       margin-bottom: 8px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
     }
-
     .surveyMetric {
       display: flex;
       align-items: center;
       gap: 6px;
     }
-
     .surveyMetricSwatch {
       width: 8px;
       height: 8px;
-      border-radius: 50%;
       flex-shrink: 0;
+      border-radius: 2px;
     }
-
     .surveyMetricLabel {
-      color: var(--text-secondary);
       flex: 1;
+      color: var(--text-secondary);
     }
-
     .surveyMetricValue {
-      color: var(--text-primary);
-      font-weight: bold;
       font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+      font-weight: 600;
     }
-
     .surveyMetricsEmpty {
-      color: var(--text-muted);
       padding-top: 8px;
-      border-top: 1px solid var(--border);
       margin-bottom: 8px;
+      color: var(--text-muted);
+      font-size: 12px;
     }
-
     .surveyPhotos {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
     }
-
     .surveyPhotoThumb {
       width: 52px;
       height: 52px;
-      border-radius: 4px;
       overflow: hidden;
-      border: 1px solid var(--border);
-      background: var(--surface-1);
       cursor: pointer;
       padding: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xs);
+      background: none;
     }
-
+    .surveyPhotoThumb:hover {
+      border-color: var(--accent);
+    }
     .surveyPhotoThumb img {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
     }
-
-    .surveyPhotoThumb:hover {
-      border-color: var(--accent);
-    }
-
     .surveyEmpty {
       color: var(--text-muted);
       font-size: 12px;
     }
 
-    /* --- Photo lightbox: a single overlay reused for whichever survey's
-       photos are open, with its own prev/next through that survey's set. --- */
+    /* --- Lightbox --- */
     #photoLightbox {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.85);
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 1000;
       padding: 48px;
       box-sizing: border-box;
+      background: rgba(0, 0, 0, 0.85);
     }
-
     #photoLightbox.open {
       display: flex;
     }
-
     #photoLightbox img {
       max-width: 100%;
       max-height: 100%;
-      border-radius: 4px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      border-radius: var(--radius-sm);
     }
-
     .lightboxClose {
       position: absolute;
       top: 16px;
       right: 20px;
-      background: none;
-      border: none;
-      color: #fff;
-      font-size: 30px;
-      line-height: 1;
       cursor: pointer;
       padding: 4px 8px;
     }
-
     .lightboxNav {
       position: absolute;
       top: 50%;
       transform: translateY(-50%);
-      background: rgba(255, 255, 255, 0.12);
-      border: none;
-      color: #fff;
-      font-size: 26px;
       width: 44px;
       height: 44px;
-      border-radius: 50%;
       cursor: pointer;
+      border-radius: 50%;
     }
-
-    .lightboxNav:hover {
-      background: rgba(255, 255, 255, 0.25);
-    }
-
     .lightboxNav:disabled {
-      opacity: 0.25;
       cursor: default;
     }
-
     #lightboxPrev {
       left: 16px;
     }
-
     #lightboxNext {
       right: 16px;
     }
-
     .lightboxCaption {
       position: absolute;
       bottom: 18px;
       left: 50%;
       transform: translateX(-50%);
-      color: var(--text-secondary);
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: var(--radius-pill);
       font-size: 12px;
     }
 
-    /* --- Water quality trend chart: its own bar across the bottom of the
-       map area, not the details panel, so it stays visible however a
-       location's details scroll. --- */
+    /* --- Chart panel --- */
     #chartPanel {
       flex: 0 0 30%;
       min-height: 160px;
       box-sizing: border-box;
       padding: 12px 20px;
+      overflow: hidden;
       background: var(--surface-1);
       border: 1px solid var(--border);
-      overflow: hidden;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
     }
-
     #chartPlaceholder {
       height: 100%;
       display: flex;
@@ -1899,23 +1436,12 @@
       justify-content: center;
       color: var(--text-muted);
       font-size: 13px;
-      text-align: center;
     }
-
-    /* The chart reads its colors from the same dashboard-wide tokens above
-       (--surface-1, --text-primary, --gridline, --baseline, etc.) rather
-       than its own light/dark pair, so it's guaranteed to match everything
-       else on the page instead of following the OS separately. */
     #trendChartRoot {
       height: 100%;
       display: flex;
       flex-direction: column;
     }
-
-    /* Holds .chartTitle side by side with chartFitToDataBtn - the title
-       shrinks/truncates first (flex:1, ellipsis) if the two ever don't
-       fit on one line, since the button's own label needs to stay whole
-       to still read as a button. */
     .chartTitleRow {
       display: flex;
       align-items: center;
@@ -1924,135 +1450,90 @@
       margin-bottom: 6px;
       flex-shrink: 0;
     }
-
     .chartTitle {
-      font-size: 13px;
-      font-weight: bold;
-      color: var(--text-primary);
       flex: 1;
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
     }
-
-    /* Toggles renderChart's y-axis between the fixed equipment-range
-       domain (default - see EQUIPMENT_RANGE_BY_METRIC) and the old
-       data-driven one that scales to whatever's currently plotted - same
-       subToggleBtn box look as the sidebar's other toggle buttons, just
-       sitting in the chart title row instead of a subControlRow. Disabled
-       (see renderChart) whenever the selected metric has no fixed range
-       to depart from in the first place - it's already fitting to data
-       either way then - but its own on/off state is left alone rather
-       than reset, so switching to a metric that DOES have a range, then
-       back, remembers what it was set to. */
     .chartFitToDataBtn {
       flex-shrink: 0;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 11px;
     }
-
     .chartWrap {
       position: relative;
-      background: var(--surface-1);
       flex: 1;
       min-height: 0;
     }
-
     .chartWrap svg {
       display: block;
       width: 100%;
       height: 100%;
       overflow: visible;
     }
-
     .chartWrap svg text {
       font-family: sans-serif;
     }
-
-    .chartEmpty {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
     .chartEmpty:not([hidden]) {
       height: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
-      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
     }
-
-    /* `position: fixed` (not absolute) so the tooltip floats in viewport
-       space above the map, details panel and everything else, instead of
-       being clipped by #chartPanel's overflow:hidden or z-index-stacked
-       under a sibling panel - see showPointAt() for the matching
-       viewport-coordinate math and edge-clamping. */
     .chartTooltip {
       position: fixed;
       pointer-events: none;
       z-index: 2000;
-      background: var(--text-primary);
-      color: var(--surface-1);
-      font-size: 11px;
-      line-height: 1.4;
       padding: 4px 7px;
-      border-radius: 4px;
       transform: translate(-50%, -100%) translateY(-8px);
       white-space: nowrap;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xs);
+      box-shadow: var(--shadow-sm);
+      color: var(--text-primary);
+      font-size: 11px;
     }
-
     .chartTooltip .ttValue {
       font-weight: bold;
     }
-
     .chartTooltip .ttDate {
       opacity: 0.75;
     }
-
-    /* Shown in the tooltip only for a point flagged atLimit - see
-       showPointAt() and the matching ring drawn around the point itself
-       in renderChart(). Deliberately a fixed red, not a theme variable,
-       to match the ring's color on both surfaces. */
     .chartTooltip .ttLimit {
-      color: #ff8a80;
-      font-size: 10px;
       margin-top: 2px;
+      color: var(--text-muted);
     }
-
-    /* --- Comparing two sites stacks one reading-block per site inside the
-       same tooltip, separated by a hairline rather than two floating
-       tooltips. --- */
     .chartTooltip .ttSite {
-      font-weight: bold;
       margin-bottom: 2px;
+      color: var(--text-secondary);
     }
-
     .chartTooltip > div + div {
       margin-top: 6px;
       padding-top: 6px;
-      border-top: 1px solid rgba(255, 255, 255, 0.25);
+      border-top: 1px solid var(--border);
     }
-
-    /* --- Chart legend: only shown when comparing 2 sites (a single site's
-       line is already fully named by the chart title). Each site keeps the
-       selected metric's own color - solid for the first site, dashed for
-       the second - so two lines of the SAME metric read as "one metric,
-       two places" rather than looking like two different metrics. --- */
     .chartLegend {
       display: flex;
       gap: 14px;
       flex-shrink: 0;
       margin-bottom: 6px;
+      font-size: 11px;
+      color: var(--text-secondary);
     }
-
     .chartLegendItem {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 11px;
-      color: var(--text-secondary);
     }
-
     .chartLegendSwatch {
       width: 16px;
       height: 2px;
@@ -2060,37 +1541,29 @@
       border-radius: 1px;
       background: var(--legend-color);
     }
-
     .chartLegendSwatch.dashed {
       height: 0;
       background: none;
       border-top: 2px dashed var(--legend-color);
     }
-
-    /* --- Key for the faint red ring drawn around any chart point whose
-       reading was at/beyond the equipment's detection limit (see
-       METRIC_CATALOG's equipmentLimitField and renderChart) - shown under
-       the chart only when the currently plotted points include at least
-       one flagged one. --- */
     .chartLimitNote {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 11px;
-      color: var(--text-muted);
       flex-shrink: 0;
       margin-top: 4px;
+      font-size: 11px;
+      color: var(--text-muted);
     }
-
     .chartLimitNote .swatch {
       width: 10px;
       height: 10px;
+      flex-shrink: 0;
       border-radius: 50%;
       border: 2px solid rgba(214, 45, 38, 0.55);
-      flex-shrink: 0;
     }
 
-    /* --- Site league table --- */
+    /* --- League table --- */
     #leagueArea {
       display: none;
       flex-grow: 1;
@@ -2098,136 +1571,94 @@
       padding: 24px 32px;
       box-sizing: border-box;
       overflow-y: auto;
-      background: var(--surface-1);
-      color: var(--text-primary);
     }
-
     .leagueHeader h2 {
-      font-size: 18px;
       margin: 0 0 2px;
-      color: var(--text-primary);
+      font-size: 18px;
     }
-
     .leagueOrgName {
+      margin-bottom: 16px;
       color: var(--text-secondary);
       font-size: 13px;
-      margin-bottom: 16px;
     }
-
     #leagueEmpty {
-      color: var(--text-muted);
-      font-size: 13px;
       margin-top: 8px;
+      color: var(--text-muted);
     }
-
     .tableScroll {
       overflow-x: auto;
     }
-
     #leagueTable {
-      border-collapse: collapse;
       width: 100%;
+      border-collapse: collapse;
       font-size: 13px;
     }
-
     #leagueTable th,
     #leagueTable td {
       padding: 8px 12px;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
       white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
     }
-
     #leagueTable td {
       color: var(--text-primary);
     }
-
     #leagueTable th {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      color: var(--text-secondary);
-      border-bottom: 2px solid var(--border-strong);
       cursor: pointer;
       user-select: none;
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
     }
-
     #leagueTable th:hover {
       color: var(--accent);
     }
-
     #leagueTable th:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: -2px;
     }
-
     #leagueTable tbody tr {
       cursor: pointer;
     }
-
     #leagueTable tbody tr:hover {
       background: var(--surface-2);
     }
-
     #leagueTable tbody tr.leagueRowSelected {
-      background: rgba(57, 135, 229, 0.16);
+      background: var(--surface-highlight);
     }
-
     #leagueTable tbody tr.leagueRowSelected:hover {
-      background: rgba(57, 135, 229, 0.24);
+      background: var(--surface-highlight);
     }
-
     #leagueTable tbody tr:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: -2px;
     }
-
+    .sortArrow {
+      color: var(--accent);
+      font-size: 9px;
+    }
     .leagueColCheck {
       width: 32px;
-      text-align: center;
     }
-
     .leagueSelectionBar {
       display: flex;
       align-items: center;
       gap: 10px;
       margin-bottom: 10px;
-      font-size: 13px;
       color: var(--text-secondary);
-    }
-
-    .leagueSelectionBar button {
-      background: none;
-      border: 1px solid var(--border-strong);
-      color: var(--text-primary);
-      border-radius: 4px;
-      padding: 4px 10px;
       font-size: 12px;
+    }
+    .leagueSelectionBar button {
+      padding: 4px 10px;
       cursor: pointer;
+      font-size: 11px;
     }
-
-    .leagueSelectionBar button:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
     .leagueColNum {
-      text-align: right;
       font-variant-numeric: tabular-nums;
     }
 
-    .sortArrow {
-      color: var(--accent);
-      font-size: 9px;
-    }
-
-    /* --- Organisation details: currently just "what equipment is this
-       org using" (one card per metric, the device behind its most recent
-       reading anywhere in the organisation - see renderOrgDetails), but
-       meant to grow into a fuller "about this org" page over time. Shares
-       #leagueArea's box/header/empty-state look (.leagueHeader,
-       .leagueOrgName, its own #orgDetailsEmpty mirrors #leagueEmpty)
-       rather than duplicating it, so the two tabs read as one family. --- */
+    /* --- Org details tab --- */
     #orgArea {
       display: none;
       flex-grow: 1;
@@ -2235,61 +1666,42 @@
       padding: 24px 32px;
       box-sizing: border-box;
       overflow-y: auto;
-      background: var(--surface-1);
-      color: var(--text-primary);
     }
-
     #orgDetailsEmpty {
-      color: var(--text-muted);
-      font-size: 13px;
       margin-top: 8px;
+      color: var(--text-muted);
     }
-
     #orgArea h3 {
-      font-size: 14px;
       margin: 0 0 10px;
-      color: var(--text-primary);
+      font-size: 15px;
     }
 
-    /* --- Scorecards tab: its own map, full-bleed like #mapArea rather
-       than padded/scrolling like #leagueArea/#orgArea above - the map is
-       the whole point of this tab, not a summary alongside other content.
-       No header of its own - the tab bar above already identifies it. --- */
+    /* --- Scorecards tab --- */
     #scorecardsArea {
       display: none;
       flex-direction: column;
       flex-grow: 1;
       min-width: 0;
       min-height: 0;
-      background: var(--surface-1);
-      color: var(--text-primary);
     }
-
     #scorecardsMapWrap {
       flex-grow: 1;
       min-height: 0;
       display: flex;
     }
-
     #scorecardsMapColumn {
       flex-grow: 1;
       min-width: 0;
       display: flex;
     }
-
     #scorecardsViewDiv {
       flex-grow: 1;
       min-height: 0;
-      background: var(--surface-1);
+      border-radius: var(--radius-sm);
     }
-
-    /* --- The NRS scorecard panel that opens (on the right) when a WFD
-       waterbody is clicked (see showWaterbodyScorecards) - hidden
-       (display:none, so it takes no width) until then. Sized/scrollable
-       the same way #detailsPanel is on the main Map tab, for the same
-       reason (a column of rows that can run longer than the viewport).
-       Wider than a typical side panel (420px, vs. #detailsPanel's 320px)
-       since more is going into it than a handful of spoke rows. --- */
+    #scorecardsNrsPanel {
+      border-left: 1px solid var(--border);
+    }
     .scorecardsSidePanel {
       display: none;
       flex-direction: column;
@@ -2299,103 +1711,55 @@
       box-sizing: border-box;
       overflow-y: auto;
       background: var(--surface-1);
-      color: var(--text-primary);
-    }
-
-    #scorecardsNrsPanel {
       border-left: 1px solid var(--border);
     }
-
     .scorecardsPanelHeader {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 8px;
     }
-
     .scorecardsPanelHeader h3 {
       margin: 0;
-      font-size: 14px;
-      color: var(--text-primary);
+      font-size: 15px;
     }
-
     .scorecardsPanelHeaderActions {
       display: flex;
       align-items: center;
       gap: 4px;
     }
-
     .scorecardsPanelDownloadBtn {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text-secondary);
-      font-size: 12px;
-      line-height: 1;
       cursor: pointer;
       padding: 4px 8px;
+      font-size: 11px;
     }
-
-    .scorecardsPanelDownloadBtn:hover:not(:disabled) {
-      color: var(--text-primary);
-      border-color: var(--text-secondary);
-    }
-
     .scorecardsPanelDownloadBtn:disabled {
-      opacity: 0.5;
       cursor: not-allowed;
     }
-
     .scorecardsPanelClose {
-      background: none;
-      border: none;
-      color: var(--text-secondary);
-      font-size: 18px;
-      line-height: 1;
       cursor: pointer;
       padding: 0 4px;
+      font-size: 16px;
+      background: none;
+      border: none;
     }
-
-    .scorecardsPanelClose:hover {
-      color: var(--text-primary);
-    }
-
-    /* The currently-applied date-range filter (see
-       dateRangeFilterDescription) - e.g. "Last 3 months" or a custom
-       span - sits just under the waterbody name, above the ratings, so
-       it's clear at a glance what window the ratings below are drawn
-       from. The scorecard's own observed data span moved into the Data
-       section's National River Survey row instead (see
-       scorecardDataSourceRows). */
     .scorecardsDataCoverage {
-      color: var(--text-secondary);
-      font-size: 12px;
       margin-top: 2px;
       margin-bottom: 10px;
+      color: var(--text-muted);
+      font-size: 11px;
     }
-
-    /* --- The scorecard wheel - an 8-slice ring (see renderScorecardWheel),
-       one wedge per SCORECARD_SPOKES entry plus muted "TBD" placeholders
-       filling the rest, with the overall rating in a solid center hub.
-       Sized by its own square aspect ratio (the viewBox is 300x300)
-       rather than a fixed pixel height, so it scales cleanly with the
-       420px-wide panel. --- */
     .scorecardsWheelWrap {
       display: flex;
       justify-content: center;
       margin: 4px 0 8px;
     }
-
     .scorecardsWheelSvg {
       width: 100%;
       max-width: 300px;
       height: auto;
       display: block;
     }
-
-    /* The color key under the wheel - the same 5-band palette as every
-       wedge, spelled out in words so a wedge's color is never the only
-       way to read its rating (see anti-patterns: color never alone). */
     .scorecardsWheelLegend {
       display: flex;
       flex-wrap: wrap;
@@ -2403,366 +1767,257 @@
       column-gap: 12px;
       row-gap: 4px;
       margin-bottom: 8px;
+      font-size: 11px;
+      color: var(--text-secondary);
     }
-
     .scorecardsWheelLegendItem {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      font-size: 11px;
-      color: var(--text-secondary);
     }
-
-    /* The colored dot next to a legend label - the band's own color
-       (SCORECARD_RATING_BANDS' own quality-rating palette, not the map's
-       WFD_BAND_STYLE - see the comment above SCORECARD_RATING_BANDS for
-       why they're kept separate). */
     .scorecardsBandDot {
       display: inline-block;
       width: 9px;
       height: 9px;
-      border-radius: 50%;
       flex-shrink: 0;
+      border-radius: 50%;
     }
-
-    /* Which specific wildlife/invasive species were recorded (see
-       scorecardSpeciesGroups) - the WL/INNS wedges only have room for a
-       richness count, not names. One small card per group, colour-coded
-       (green for wildlife, rust for invasives - see
-       SCORECARD_SPECIES_GROUPS) and independent of the rank-band palette
-       used everywhere else, so a card never reads as a rating. Mirrored
-       in the printed report by drawScorecardSpeciesBoxPdf. */
     .scorecardsSpeciesList {
       display: flex;
       flex-direction: column;
       gap: 8px;
       margin-bottom: 12px;
     }
-
     .scorecardsSpeciesBox {
-      background: var(--surface-2);
-      border-radius: 8px;
       padding: 8px 12px 10px;
+      background: var(--surface-2);
+      border-radius: var(--radius-sm);
       border-left: 3px solid var(--species-color, var(--border-strong));
     }
-
     .scorecardsSpeciesBoxHeading {
-      font-size: 11px;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      color: var(--species-color, var(--text-secondary));
       margin-bottom: 6px;
+      color: var(--species-color, var(--text-primary));
+      font-weight: 600;
+      font-size: 12px;
     }
-
     .scorecardsSpeciesChips {
       display: flex;
       flex-wrap: wrap;
       gap: 5px;
     }
-
     .scorecardsSpeciesChip {
-      font-size: 12px;
-      color: var(--text-primary);
-      background: var(--species-chip-bg, var(--surface-3));
-      border-radius: 999px;
       padding: 2px 9px;
+      background: var(--species-chip-bg, var(--surface-3));
+      color: var(--text-primary);
+      border-radius: var(--radius-pill);
+      font-size: 11px;
     }
-
     .scorecardsSpeciesEmpty {
-      font-size: 12px;
       color: var(--text-muted);
+      font-size: 12px;
       font-style: italic;
     }
-
-    /* --- Trends: one small chart per present metric (Orthophosphate/Nitrate/
-       Ammonia - see renderScorecardTrendCharts), stacked in the same
-       420px-wide column as the wheel above it. Left empty (no heading, no
-       placeholder) when none of the three have any data for this
-       waterbody/date range - the section just doesn't take up space. --- */
     .scorecardsTrendCharts {
       display: flex;
       flex-direction: column;
       gap: 12px;
       margin: 4px 0 8px;
     }
-
     .scorecardsTrendChart {
-      background: var(--surface-2);
-      border-radius: 6px;
       padding: 10px 10px 6px;
+      background: var(--surface-2);
+      border-radius: var(--radius-sm);
     }
-
     .scorecardsTrendChartTitle {
-      font-size: 12px;
-      font-weight: bold;
-      color: var(--text-primary);
       margin-bottom: 4px;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
     }
-
     .scorecardsTrendChartSvg {
       display: block;
       width: 100%;
       height: 130px;
     }
-
-    /* The NRS panel's closing note, set dynamically - loading state, or
-       "no sites for this waterbody"/error flags. The survey-and-site
-       count summary that used to live here moved into
-       .scorecardsDataSources below (see renderScorecardDataSources). */
     .scorecardsComingSoon {
+      margin-top: 12px;
       color: var(--text-muted);
       font-size: 12px;
-      font-style: italic;
-      margin-top: 12px;
     }
-
-    /* "Data" section, right at the bottom of the panel - one row per raw
-       data source that feeds the wheel's spokes (National River Survey,
-       Riverfly, Storm Overflow Outfalls), each citing its own site/
-       sample/outfall count - see renderScorecardDataSources. */
     .scorecardsDataSources {
       margin-top: 14px;
       padding-top: 12px;
-      border-top: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       gap: 6px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 11px;
     }
-
     .scorecardsDataSourceRow {
-      font-size: 12px;
       color: var(--text-secondary);
+      font-size: 12px;
       line-height: 1.4;
     }
-
     .scorecardsDataSourceName {
-      font-weight: bold;
       color: var(--text-primary);
+      font-weight: bold;
     }
-
     .equipCardGrid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       gap: 12px;
     }
-
     .equipCard {
-      background: var(--surface-2);
-      border-radius: 6px;
       padding: 12px 14px;
+      background: var(--surface-2);
+      border-radius: var(--radius-sm);
       border-top: 3px solid var(--metric-color, var(--border-strong));
     }
-
     .equipCard .equipMetric {
+      margin-bottom: 4px;
+      color: var(--text-muted);
       font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.03em;
-      color: var(--text-secondary);
-      margin-bottom: 4px;
     }
-
     .equipCard .equipName {
-      font-size: 14px;
-      font-weight: bold;
-      color: var(--text-primary);
       margin-bottom: 2px;
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 13px;
     }
-
     .equipCard .equipManufacturer {
-      font-size: 12px;
-      color: var(--text-secondary);
       margin-bottom: 8px;
-    }
-
-    .equipCard .equipSpecRow {
-      font-size: 12px;
       color: var(--text-secondary);
+      font-size: 12px;
+    }
+    .equipCard .equipSpecRow span:last-child {
+      color: var(--text-primary);
+      text-align: right;
+    }
+    .equipCard .equipDocsLink {
+      display: inline-block;
+      margin-top: 8px;
+      color: var(--accent);
+      font-size: 12px;
+      text-decoration: none;
+    }
+    .equipCard .equipDocsLink:hover {
+      text-decoration: underline;
+    }
+    .equipCard .equipNoData {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-style: italic;
+    }
+    .equipCard .equipSpecRow {
       display: flex;
       justify-content: space-between;
       gap: 8px;
       padding: 3px 0;
       border-top: 1px solid var(--border);
-    }
-
-    .equipCard .equipSpecRow span:last-child {
-      color: var(--text-primary);
-      text-align: right;
-    }
-
-    .equipCard .equipDocsLink {
-      display: inline-block;
-      margin-top: 8px;
       font-size: 12px;
-      color: var(--accent);
-      text-decoration: none;
+      color: var(--text-secondary);
     }
 
-    .equipCard .equipDocsLink:hover {
-      text-decoration: underline;
-    }
-
-    .equipCard .equipNoData {
-      font-size: 12px;
-      color: var(--text-muted);
-      font-style: italic;
-    }
-
-    /* --- Small screens (phones, narrow tablets): the desktop layout is
-       three side-by-side fixed-width columns (320px sidebar + map + 320px
-       details panel) inside a non-scrolling 100%-height shell - that
-       simply doesn't fit a ~375-430px phone. Below this width the whole
-       thing stacks into one normally-scrolling column instead: sidebar,
-       then map, then chart, then details panel, each full width. Anything
-       that relied on flex-grow to fill a bounded parent height (the map,
-       the chart panel) gets an explicit viewport-relative height instead,
-       since there's no longer a bounded height to grow into. ---
-    */
     @media (max-width: 700px) {
       html, body {
         height: auto;
         min-height: 100%;
       }
-
-      /* Each group stacks full-width rather than wrapping mid-row. */
       #topBar {
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
       }
-
-      /* .topBarTitle's fixed 296px (see the main stylesheet) is only for
-         lining it up with the map when groups sit side by side - here
-         they stack full-width instead, so it goes back to sizing itself
-         to its own content like every other group. */
       .topBarTitle {
         width: auto;
       }
-
       #topBar #orgFilter {
         width: 100%;
       }
-
       #appContainer {
         flex-direction: column;
         height: auto;
         min-height: 100%;
         width: 100%;
       }
-
-      /* Border is now uniform all-around (.dashboardCard) regardless of
-         orientation, so nothing needs toggling here beyond width/scroll. */
       #sidebar {
         width: 100%;
         overflow-y: visible;
       }
-
       #mapArea {
         flex-direction: column;
         flex-grow: 0;
         width: 100%;
         min-width: 0;
       }
-
       #mapColumn {
         flex-grow: 0;
       }
-
       #viewDiv {
         flex-grow: 0;
         height: 42vh;
       }
-
-      /* Determinand picker (.mapMetricPicker/#mapMetricPicker) - a fixed
-         220px was sized for a full desktop map; here the map itself is
-         only 42vh tall (above), so the same card would cover a much
-         bigger share of it. Narrower, shorter, and each row a bit more
-         compact so it still reads as a small overlay rather than
-         crowding out the map underneath it. */
       .mapMetricPicker {
         width: 168px;
         max-height: 45vh;
         padding: 8px 10px 10px;
       }
-
-      .mapMetricPicker label {
-        font-size: 12px;
-      }
-
       .mapMetricPicker .metricItem {
         padding: 4px 6px;
-        font-size: 12px;
         gap: 6px;
       }
-
       .mapMetricPicker .metricSwatch {
         width: 8px;
         height: 8px;
       }
-
       #chartPanel {
         flex: 0 0 auto;
         height: 28vh;
         min-height: 160px;
       }
-
       #detailsPanel {
         width: 100%;
         overflow-y: visible;
       }
-
       #leagueArea {
         padding: 16px;
       }
-
       #orgArea {
         padding: 16px;
       }
-
       #scorecardsMapWrap {
         flex-direction: column;
       }
-
       #scorecardsMapColumn {
         flex-grow: 0;
       }
-
       #scorecardsViewDiv {
         flex-grow: 0;
         height: 42vh;
       }
-
       .scorecardsSidePanel {
         width: 100%;
         max-height: 30vh;
       }
-
       #scorecardsNrsPanel {
         border-left: none;
         border-top: 1px solid var(--border);
       }
-
-      /* Bigger touch targets for the carousel's prev/next - 26px is a
-         mouse-pointer size, too small to comfortably tap. */
       .surveyNavBtn {
         width: 36px;
         height: 36px;
-        font-size: 18px;
       }
-
-      /* Less padding around the lightbox image so it actually gets to use
-         most of a phone's narrow width. */
       #photoLightbox {
         padding: 16px 12px;
       }
-
       .lightboxNav {
         width: 40px;
         height: 40px;
       }
     }
-
-  </style>
+</style>
 
   <script>
     require([
@@ -9731,7 +8986,8 @@
           if (box) {
             const band = collected ? wfdBandForValue(m.key, value) : null;
             box.style.background = band ? hexToRgba(band.color, 0.22) : "";
-            el.style.color = band ? band.color : "";
+            const row = el.closest(".statValueRow") || el;
+            row.style.color = band ? band.color : "";
           }
         });
       }
@@ -11462,36 +10718,59 @@
 
           <div class="statGrid">
             <div class="statBox">
-              <div class="value" id="statSurveys"></div>
+              <div class="statValueRow">
+                <div class="value" id="statSurveys"></div>
+              </div>
               <div class="label">Total Surveys</div>
             </div>
             <div class="statBox">
-              <div class="value" id="statPhosphate"></div>
-              <div class="label">Avg Orthophosphate (mg/L)</div>
+              <div class="statValueRow">
+                <div class="value" id="statPhosphate"></div>
+                <span class="statUnit">mg/L</span>
+              </div>
+              <div class="label">Avg Orthophosphate</div>
             </div>
             <div class="statBox">
-              <div class="value" id="statNitrate"></div>
-              <div class="label">Median Nitrate (mg/L)</div>
+              <div class="statValueRow">
+                <div class="value" id="statNitrate"></div>
+                <span class="statUnit">mg/L</span>
+              </div>
+              <div class="label">Median Nitrate</div>
             </div>
             <div class="statBox">
-              <div class="value" id="statNitrite"></div>
-              <div class="label">Median Nitrite (mg/L)</div>
+              <div class="statValueRow">
+                <div class="value" id="statNitrite"></div>
+                <span class="statUnit">mg/L</span>
+              </div>
+              <div class="label">Median Nitrite</div>
             </div>
             <div class="statBox">
-              <div class="value" id="statAmmonia"></div>
-              <div class="label">Median Ammonia (mg/L)</div>
+              <div class="statValueRow">
+                <div class="value" id="statAmmonia"></div>
+                <span class="statUnit">mg/L</span>
+              </div>
+              <div class="label">Median Ammonia</div>
             </div>
             <div class="statBox">
-              <div class="value" id="statTurbidity"></div>
-              <div class="label">Avg Turbidity (NTU)</div>
+              <div class="statValueRow">
+                <div class="value" id="statTurbidity"></div>
+                <span class="statUnit">NTU</span>
+              </div>
+              <div class="label">Avg Turbidity</div>
             </div>
             <div class="statBox">
-              <div class="value" id="statConductivity"></div>
-              <div class="label">Avg Conductivity (uS/cm)</div>
+              <div class="statValueRow">
+                <div class="value" id="statConductivity"></div>
+                <span class="statUnit">uS/cm</span>
+              </div>
+              <div class="label">Avg Conductivity</div>
             </div>
             <div class="statBox">
-              <div class="value" id="statTemperature"></div>
-              <div class="label">Avg Temperature (&deg;C)</div>
+              <div class="statValueRow">
+                <div class="value" id="statTemperature"></div>
+                <span class="statUnit">&deg;C</span>
+              </div>
+              <div class="label">Avg Temperature</div>
             </div>
           </div>
 
