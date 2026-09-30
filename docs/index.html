@@ -180,6 +180,17 @@
       gap: 12px;
     }
 
+    /* --- Expand map view (see mapExpandBtn, added on the map itself via
+       view.ui.add) - hides the sidebar and details panel so #mapArea and
+       #mapColumn, both already flex-grow: 1, fill the space their
+       320px-fixed neighbours leave behind. #chartPanel is a child of
+       #mapColumn (see #mapArea below), so it widens right along with the
+       map - nothing about it needs its own rule here. */
+    #appContainer.mapExpanded #sidebar,
+    #appContainer.mapExpanded #detailsPanel {
+      display: none;
+    }
+
     /* --- Top bar --- */
     #topBar {
       display: flex;
@@ -448,6 +459,7 @@
     /* --- Buttons (generic) --- */
     .themeToggleBtn,
     .imageryToggleBtn,
+    .mapExpandBtn,
     .scorecardsDeselectBtn,
     .dateRangeClearBtn,
     .datePresetBtn,
@@ -469,6 +481,7 @@
     }
     .themeToggleBtn:hover,
     .imageryToggleBtn:hover,
+    .mapExpandBtn:hover,
     .scorecardsDeselectBtn:hover,
     .dateRangeClearBtn:hover,
     .datePresetBtn:hover,
@@ -497,10 +510,12 @@
     .scorecardsPanelDownloadBtn:disabled {
       opacity: 0.4;
     }
-    .imageryToggleBtn {
+    .imageryToggleBtn,
+    .mapExpandBtn {
       border-radius: 50%;
     }
-    .imageryToggleBtn.active {
+    .imageryToggleBtn.active,
+    .mapExpandBtn.active {
       background: var(--accent);
       border-color: var(--accent);
       color: var(--text-inverse);
@@ -551,7 +566,8 @@
       font-size: 13px;
       line-height: 1;
     }
-    .imageryToggleBtn {
+    .imageryToggleBtn,
+    .mapExpandBtn {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1031,7 +1047,7 @@
     .tabButton[data-tab="scorecards"] {
       display: none;
     }
-    
+
     /* --- Map area --- */
     #mapArea {
       display: flex;
@@ -1450,8 +1466,15 @@
       margin-bottom: 6px;
       flex-shrink: 0;
     }
-    .chartTitle {
+    .chartTitleGroup {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
       flex: 1;
+    }
+    .chartTitle {
+      flex: 0 1 auto;
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1551,7 +1574,7 @@
       align-items: center;
       gap: 6px;
       flex-shrink: 0;
-      margin-top: 4px;
+      white-space: nowrap;
       font-size: 11px;
       color: var(--text-muted);
     }
@@ -4527,6 +4550,61 @@
         imageryToggleBtn.title = useImageryBasemap
           ? "Switch back to the reference basemap"
           : "Show satellite imagery basemap";
+      });
+
+      // --- Expand the map to fill the whole width, in response to
+      //     feedback that it can feel small - covers the sidebar and
+      //     details panel (see #appContainer.mapExpanded in the
+      //     stylesheet); the chart panel stays put and just widens along
+      //     with the map, since it's a child of #mapColumn rather than a
+      //     third side panel of its own. Docked bottom-left, the one
+      //     corner still free (imagery toggle is top-right, the metric
+      //     picker is top-left, zoom is bottom-right - see view.ui.move
+      //     above). Same plain-button-with-Esri-widget-classes approach as
+      //     imageryToggleBtn just above, for the same reasons - and reuses
+      //     its exact look via the shared .mapExpandBtn rules next to
+      //     .imageryToggleBtn in the stylesheet. ---
+      const mapExpandBtn = document.createElement("button");
+      mapExpandBtn.type = "button";
+      mapExpandBtn.className = "esri-widget--button esri-widget esri-interactive mapExpandBtn";
+      mapExpandBtn.setAttribute("aria-pressed", "false");
+      mapExpandBtn.title = "Expand map";
+      mapExpandBtn.innerHTML = '<span aria-hidden="true">⛶</span>';
+      view.ui.add(mapExpandBtn, "bottom-left");
+
+      let mapExpanded = false;
+      const appContainerEl = document.getElementById("appContainer");
+
+      function setMapExpanded(expanded) {
+        mapExpanded = expanded;
+        appContainerEl.classList.toggle("mapExpanded", mapExpanded);
+        mapExpandBtn.classList.toggle("active", mapExpanded);
+        mapExpandBtn.setAttribute("aria-pressed", String(mapExpanded));
+        mapExpandBtn.title = mapExpanded ? "Exit expanded map view" : "Expand map";
+        // switchTab (see .tabButton click handlers further down) sets
+        // #sidebar's display directly via inline style, which always beats
+        // the #appContainer.mapExpanded CSS rule above - so once any tab
+        // switch has happened, that inline style is what's actually in
+        // control, and this has to update it directly too rather than
+        // leaning on the CSS class alone.
+        sidebarEl.style.display = (currentTab === "map" && !mapExpanded) ? "flex" : "none";
+        // The trend chart (see renderChart) measures its own container's
+        // actual rendered size rather than assuming a fixed width, same as
+        // it does for a plain window resize (see the "resize" listener
+        // further down) - but hiding the side panels here doesn't fire a
+        // "resize" event of its own, so it needs its own nudge to redraw
+        // at the newly-widened size.
+        if (selectedSites.length > 0) renderChart();
+      }
+
+      mapExpandBtn.addEventListener("click", function () {
+        setMapExpanded(!mapExpanded);
+      });
+
+      // Escape exits the expanded view - the same courtesy given to the
+      // storm popup, lightbox and scorecards panel elsewhere in this file.
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && mapExpanded) setMapExpanded(false);
       });
 
       // --- Keeps the map's highlight rings in sync with `selectedSites`
@@ -8316,8 +8394,12 @@
         // The sidebar (contextual layers) only means anything on the map
         // - hidden on the other tabs so they get the full width, same
         // idea as mapArea below (which the map metric picker moves with,
-        // being part of the map view itself now).
-        sidebarEl.style.display = tab === "map" ? "flex" : "none";
+        // being part of the map view itself now). Also stays hidden if
+        // the map is currently expanded (see setMapExpanded) - switching
+        // tabs and back shouldn't undo that, since this inline style
+        // otherwise wins over #appContainer.mapExpanded's CSS rule no
+        // matter what the expand button's own state is.
+        sidebarEl.style.display = (tab === "map" && !mapExpanded) ? "flex" : "none";
         mapArea.style.display = tab === "map" ? "flex" : "none";
         leagueArea.style.display = tab === "league" ? "block" : "none";
         orgArea.style.display = tab === "org" ? "block" : "none";
@@ -10534,8 +10616,9 @@
           <button type="button" class="whatsNewCloseBtn" id="whatsNewCloseBtn" aria-label="Close">&times;</button>
           <div class="whatsNewHeader">v1.1 updates</div>
           <ul class="whatsNewList">
-            <li><strong>Threshold bandings </strong>(Low / Slightly Elevated / Elevated / High / Very High) for the 7 NRS determinands have been produced &ndash; these threshold bands appear on the map, the charts and in the summary panel. See data guide for more information.</li>
-            <li><strong>Natioanl Soils Map layer added. </strong> Data originates from  Cranfield University, Land Information System LandIS® Portal NationalSoilMap</li>
+            <li><strong>Threshold bandings </strong>&ndash; (Low / Slightly Elevated / Elevated / High / Very High) for the 7 NRS determinands have been produced &ndash; these threshold bands appear on the map, the charts and in the summary panel. See data guide for more information.</li>
+            <li><strong>Expand map focus view </strong> &ndash; There is now a button to expand the map. This button can be found at the bottom left of the map.</li>
+            <li><strong>Natioanl Soils Map layer added </strong> &ndash; Data originates from  Cranfield University, Land Information System LandIS® Portal NationalSoilMap</li>
             <li><strong>Fixed chart axis, based on equipment range</strong> &ndash; the trend chart's y-axis defaults at the widest range the recording equipment can detect (temperature is capped at 40, as river temperature beyond that are unlikely). A "Fit to data" button on the chart switches is also available.</li>
             <li><strong>Cleaner chart gridlines</strong> &ndash; horizontal gridlines removed from the trend chart; the axis value labels are still there for reference.</li>
             <li><strong>UI improvements</strong> &ndash; The Rivers Trust logo added to the top bar, elements have been given soft rounded borders, determinand picker is now a separate panel on the map to make more room for the growing contextual layers area, horizontal gridlines removed from the trend chart, buttons now more aligned and removal of vertical dividers</li>
@@ -10695,7 +10778,10 @@
 
           <div class="viz-root" id="trendChartRoot" style="display: none;">
             <div class="chartTitleRow">
-              <div class="chartTitle" id="chartTitle">Orthophosphate over time</div>
+              <div class="chartTitleGroup">
+                <div class="chartTitle" id="chartTitle">Orthophosphate over time</div>
+                <div class="chartLimitNote" id="chartLimitNote" hidden><span class="swatch"></span>* reading at the equipment's detection limit</div>
+              </div>
               <button type="button" id="chartFitToDataBtn" class="subToggleBtn chartFitToDataBtn" aria-pressed="false" title="Scale the y-axis to fit only the data currently plotted, instead of this metric's fixed equipment detection range">Fit to data</button>
             </div>
             <div class="chartLegend" id="chartLegend" hidden></div>
@@ -10703,7 +10789,6 @@
               <svg id="trendChartSvg"></svg>
               <div class="chartTooltip" id="chartTooltip" hidden></div>
             </div>
-            <div class="chartLimitNote" id="chartLimitNote" hidden><span class="swatch"></span>* reading at the equipment's detection limit</div>
             <div class="chartEmpty" id="chartEmpty" hidden></div>
           </div>
         </div>
