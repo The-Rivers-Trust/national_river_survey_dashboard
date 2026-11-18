@@ -4,6 +4,11 @@
 // one row per site for the current date range:
 //   { locationID, locationName, totalSurveys, <metric.locationField>... }
 // Each determinand is a mean or median per its `aggregation` in config.
+// For the League table's other views, each determinand also gets
+// <locationField>Max (the highest single reading), <locationField>HighCount
+// (readings in the High or Very High band), <locationField>Readings (how
+// many readings there were) and <locationField>HighShare (HighCount as a
+// fraction of Readings, 0-1) - all null when there were none.
 // The Map tab's symbology and stat boxes and the League table all read
 // these same rows, so they always agree and all move with the date
 // range. Changing organisation re-queries; changing dates only
@@ -15,7 +20,10 @@
 // =====================================================================
 
 import { METRICS } from "../config.js";
-import { median } from "../metrics.js";
+import { median, bandForValue } from "../metrics.js";
+
+// Bands counted by <locationField>HighCount.
+const HIGH_BANDS = new Set(["high", "veryHigh"]);
 import { onFilterChange, getOrganisation, isWithinDateRange } from "../filters.js";
 import { fetchOrganisationSites, fetchObservationsForSites } from "./nrs-service.js";
 
@@ -139,9 +147,16 @@ function recompute() {
     const row = { locationID: site.locationID, locationName: site.locationName, totalSurveys: obs.length };
     for (const m of METRICS) {
       const values = obs.map((o) => o[m.observationField]).filter((v) => v != null);
-      if (!values.length) row[m.locationField] = null;
-      else if (m.aggregation === "median") row[m.locationField] = median(values);
-      else row[m.locationField] = values.reduce((a, b) => a + b, 0) / values.length;
+      const f = m.locationField;
+      if (!values.length) {
+        row[f] = row[`${f}Max`] = row[`${f}HighCount`] = row[`${f}Readings`] = row[`${f}HighShare`] = null;
+        continue;
+      }
+      row[f] = m.aggregation === "median" ? median(values) : values.reduce((a, b) => a + b, 0) / values.length;
+      row[`${f}Max`] = Math.max(...values);
+      row[`${f}HighCount`] = values.filter((v) => HIGH_BANDS.has(bandForValue(m.key, v)?.key)).length;
+      row[`${f}Readings`] = values.length;
+      row[`${f}HighShare`] = row[`${f}HighCount`] / values.length;
     }
     return row;
   });

@@ -28,6 +28,47 @@
 }
 
 /* ---- League table ---- */
+/* Average / Maximum / High or Very High switch, with its one-line note. */
+.leagueViewBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.leagueViewBar .leagueSubtitle {
+  margin: 0;
+}
+
+/* High or Very High view: shares above 0% stand out; 0% recedes (its
+   swatch is transparent, so the figures still line up). */
+.leagueShare {
+  color: var(--text-muted);
+}
+
+.leagueShare.hasHigh {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.leagueShareKey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.leagueShareKey li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .leagueSelectionBar {
   display: flex;
   align-items: center;
