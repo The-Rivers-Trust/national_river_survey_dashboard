@@ -1,0 +1,817 @@
+/* =====================================================================
+   MAP TAB
+   Side panel controls, map actions, trend chart, site details, and the
+   header dialogs' contents.
+   ===================================================================== */
+
+/* ---- Side panel: the determinand picker and its colour key, as on the
+   AQuA dashboard's Citizen Science map ---- */
+.controlGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.controlGroup[hidden],
+.legend[hidden],
+.hint[hidden] {
+  display: none;
+}
+
+#metricHint {
+  margin-bottom: var(--space-3);
+}
+
+.legend {
+  margin: var(--space-2) 0 var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.legendTitle {
+  margin: 0 0 var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.legendList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: 13px;
+}
+
+.legendSwatch {
+  flex: 0 0 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+/* No reading: a hollow ring, as on the map. */
+.legendSwatch--none {
+  border: 2px solid var(--text-muted);
+  box-shadow: none;
+}
+
+.legendLabel {
+  flex: 1;
+}
+
+.legendCount {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.legendNote {
+  margin: var(--space-2) 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Band rows are toggle buttons that filter the map (as on AQuA). */
+.legendRow--toggle {
+  width: 100%;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.legendRow--toggle:hover {
+  background: var(--surface-2);
+}
+
+.legendRow--toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.legendRow--toggle[aria-pressed="true"] {
+  background: var(--surface-2);
+  border-color: var(--accent);
+}
+
+.legendRow--toggle.isDimmed {
+  opacity: 0.45;
+}
+
+.legendShowAll {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---- Start screen ---- */
+.splashBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.splashLogo {
+  align-self: center;
+  height: 56px;
+  width: auto;
+}
+
+.splashIntro {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+#splashOrgList {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* Hand-drawn land cover legend (layers-panel.js) */
+.landcoverLegend h4 {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: 13px;
+}
+
+.landcoverLegend[hidden] {
+  display: none;
+}
+
+.landcoverRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px 0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.landcoverSwatch {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+}
+
+/* Label that follows the pointer over the soil map (layers-panel.js) */
+.mapHoverTip {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  font-size: 12px;
+}
+
+.mapHoverTip[hidden] {
+  display: none;
+}
+
+/* Layers: one list row per layer; a layer's options sit under it, only
+   while it's switched on. */
+.layerOptions {
+  padding: var(--space-1) 10px var(--space-2); /* lines up with the row's label and switch */
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.layerOptions[hidden] {
+  display: none;
+}
+
+.layerOptions calcite-label {
+  --calcite-label-margin-bottom: 0;
+}
+
+
+/* ---- Map actions (Basemap, Map layers, Legend, expand) ----
+   A calcite-action has no fill of its own - give it the same surface as
+   the map's other buttons, or the map shows through. */
+.mapAction {
+  --calcite-action-background-color: var(--calcite-color-foreground-1);
+  --calcite-action-background-color-hover: var(--calcite-color-foreground-2);
+  --calcite-action-background-color-press: var(--calcite-color-foreground-3);
+  background: var(--calcite-color-foreground-1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Trend chart: a drawer taking the lower part of the map's column
+   once a site is clicked (the map shrinks above it), like the AQuA
+   dashboard's league table ---- */
+.chartDrawer {
+  flex: 0 0 34%;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  box-sizing: border-box;
+  background: var(--bg-page);
+  border-top: 1px solid var(--border);
+  isolation: isolate;
+  animation: drawerUp 0.2s ease-out;
+}
+
+.chartDrawer[hidden] {
+  display: none;
+}
+
+@keyframes drawerUp {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chartDrawer { animation: none; }
+}
+
+.chartEmpty[hidden],
+.trendSvg[hidden] {
+  display: none;
+}
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.chartHeading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.chartTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chartLimitNote {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.chartLimitNote[hidden] {
+  display: none;
+}
+
+.chartLimitSwatch {
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 2px solid var(--limit-ring);
+  border-radius: 50%;
+}
+
+.chartFit {
+  --calcite-label-margin-bottom: 0;
+  flex-shrink: 0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.chartWrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.trendSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.chartEmpty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trendTick,
+.trendBandLabel {
+  fill: var(--text-muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.trendBandLabel {
+  font-size: 8px;
+}
+
+.trendValueLabel {
+  fill: var(--text-primary);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.trendBaseline {
+  stroke: var(--border);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.trendLine {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* Surface-coloured ring keeps points legible over the line. */
+.trendPoint {
+  stroke: var(--surface-1);
+  pointer-events: none;
+}
+
+.trendLimitRing {
+  fill: none;
+  stroke: var(--limit-ring);
+  stroke-width: 2;
+}
+
+.trendOverlay {
+  cursor: crosshair;
+  outline: none;
+}
+
+.trendOverlay:focus-visible {
+  fill: var(--accent);
+  fill-opacity: 0.08;
+}
+
+.trendLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin-bottom: var(--space-1);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.trendLegend[hidden] {
+  display: none;
+}
+
+.trendLegendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.trendLegendSwatch {
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--legend-color);
+}
+
+.trendLegendSwatch.isDashed {
+  height: 0;
+  background: none;
+  border-top: 2px dashed var(--legend-color);
+}
+
+.trendTooltip {
+  position: fixed;
+  z-index: 1000;
+  padding: var(--space-1) var(--space-2);
+  transform: translate(-50%, -100%) translateY(-8px);
+  white-space: nowrap;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  font-family: var(--font-family);
+  font-size: 11px;
+  color: var(--text-primary);
+  pointer-events: none;
+}
+
+.trendTooltipRow + .trendTooltipRow {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--border);
+}
+
+.trendTooltipValue {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.trendTooltipSite,
+.trendTooltipDate {
+  color: var(--text-secondary);
+}
+
+.trendTooltipLimit {
+  color: var(--text-muted);
+}
+
+/* ---- Site details (right panel) ---- */
+.detailsBody {
+  padding: var(--space-4);
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.statBox {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 56px;
+  padding: var(--space-2);
+  box-sizing: border-box;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+
+.statBox[hidden] {
+  display: none;
+}
+
+.statValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.statValue {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.statUnit {
+  font-size: 10px;
+}
+
+.statLabel {
+  margin-top: 2px;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.detailsSubhead {
+  margin: var(--space-4) 0 var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.speciesTags,
+.weatherTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.speciesTag,
+.weatherTag {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+/* A wildlife sighting is a nice find; an invasive one is a caution. */
+.speciesTag.isWildlife {
+  background: var(--status-success-bg);
+  color: var(--status-success);
+}
+
+.speciesTag.isInvasive {
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+}
+
+/* Pollution: a row per type, with a chip per amount - tinted more
+   strongly the more there was. */
+.pollutionList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pollutionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 13px;
+}
+
+.pollutionAmounts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.pollutionAmount {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.pollutionAmount--small {
+  background: var(--status-neutral-bg);
+  color: var(--text-secondary);
+}
+
+.pollutionAmount--moderate {
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+}
+
+.pollutionAmount--large {
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+}
+
+.pollutionOther {
+  margin: var(--space-3) 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.pollutionOtherLabel,
+.surveyPollutionLabel {
+  font-weight: 600;
+}
+
+.surveyPollution {
+  margin-top: var(--space-2);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Weather is neither good nor bad. */
+.weatherTag {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.weatherTags {
+  margin-bottom: var(--space-2);
+}
+
+#surveyCarousel[hidden] {
+  display: none;
+}
+
+.surveyNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+
+.surveyPosition {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.surveyCard {
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.surveyDate {
+  margin-bottom: var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.surveyFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px var(--space-3);
+  margin: 0 0 var(--space-2);
+}
+
+.surveyFields dt {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.surveyFields dd {
+  margin: 0;
+}
+
+.surveyMetrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px var(--space-3);
+  margin-bottom: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.surveyMetric {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.surveyMetricSwatch {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.surveyMetricLabel {
+  flex: 1;
+  color: var(--text-secondary);
+}
+
+.surveyMetricValue {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.surveyMetricsEmpty {
+  margin-bottom: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.surveyPhotos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.surveyPhotoThumb {
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
+.surveyPhotoThumb:hover {
+  border-color: var(--accent);
+}
+
+.surveyPhotoThumb:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.surveyPhotoThumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photoImg {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  margin: 0 auto;
+  border-radius: var(--radius);
+}
+
+/* ---- Header dialogs ---- */
+.guideTable {
+  width: 100%;
+  margin-top: var(--space-3);
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.guideTable th,
+.guideTable td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.guideTable thead th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.guideTable thead th:first-child {
+  width: 26%;
+}
+
+.guideTable thead th:nth-child(2) {
+  width: 9%;
+}
+
+.guideTable tbody th {
+  font-weight: 600;
+}
+
+.guideBandHeader {
+  text-align: center;
+}
+
+.guideSwatch {
+  display: block;
+  width: 12px;
+  height: 12px;
+  margin: 0 auto var(--space-1);
+  border-radius: 50%;
+}
+
+.guideMetric {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.guideInfoNote {
+  max-width: 280px;
+  margin: 0;
+  padding: var(--space-3);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.whatsNewList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.whatsNewList strong {
+  color: var(--text-primary);
+}

@@ -1,0 +1,458 @@
+// =====================================================================
+// LAYERS PANEL
+// The map's contextual layers, switched from a side panel on the right
+// of the map (closed until the map's "Map layers" button is pressed).
+// Ported from the AQuA dashboard - the same layers and panel:
+//   Background - one at a time: WFD waterbody classification (coloured
+//     by ecological / ammonia / orthophosphate class), National Soil Map
+//   Overlays: Open River Network (+ animated flow direction), live storm
+//     overflows (+ "discharging or in the last 48 hours" only), Event
+//     Duration Monitoring 2025 (the annual spill returns)
+// and the map's Legend panel shows a legend for whatever is switched on.
+// This file also handles clicks on the map (see initMapClicks): a site
+// goes to the tab's onSiteClick; a storm overflow or EDM outfall opens its
+// pop-up; otherwise, with the river network on, the nearest river's does.
+//
+// Every map gets its own copies of the layers (a layer can only sit in
+// one map), but there's one set of switch positions shared by all of
+// them - switch storm overflows on in one map and they're on in the
+// other too, like the basemap.
+//
+// A map's panel lives in its tab's <section> (opened and closed by
+// tool-panels.js, along with the Basemap and Legend panels):
+//   <calcite-panel class="toolPanel layersPanel" closable closed> (filled in here)
+//   <calcite-action class="layersAction"> inside the <arcgis-map>
+//   <arcgis-legend data-legend> + <p data-legend-empty> in the Legend panel
+// Call setupLayersPanel(mapEl, { isSiteLayer, onSiteClick }) right after
+// setupMap, before the tab adds its own site layer, so these sit
+// underneath the sites. showRivers() switches the river network and flow
+// on (the Map tab does when an organisation is first picked).
+// =====================================================================
+
+import { WFD_CATCHMENTS, RIVER_NETWORK, EDM_2025, SOIL_MAP, LAND_COVER } from "../config.js";
+import { escapeHtml } from "../utils/format.js";
+import { addRiverNetwork } from "./river-network.js";
+import {
+  createLandCoverLayer, createWfdLayer, wfdRenderer, wfdTitle, createSoilLayer, createStormOverflowLayers, createEdmLayer,
+  riverPopupTemplate, RIVER_POPUP_FIELDS,
+} from "./contextual-layers.js";
+
+// ---------------------------------------------------------------------
+// Shared switch positions
+// ---------------------------------------------------------------------
+
+const state = {
+  wfd: false,
+  wfdField: WFD_CATCHMENTS.fields[0].field,
+  soil: false,
+  landcover: false,
+  network: false,
+  flow: false, // animated flow direction (needs the network)
+  storm: false,
+  recent: false, // storm overflows: only discharging / discharged lately
+  edm: false,
+};
+const BACKGROUNDS = ["wfd", "soil", "landcover"];
+const maps = new Set(); // each map's { apply, view, canFlow }
+
+// A switch changed in one panel: update the shared state, keep it
+// consistent, and have every map follow.
+function change(patch) {
+  Object.assign(state, patch);
+  // backgrounds: one at a time
+  for (const key of BACKGROUNDS) if (patch[key] === true) for (const other of BACKGROUNDS) if (other !== key) state[other] = false;
+  if (patch.network === false) state.flow = false;
+  if (patch.flow === true) state.network = true;
+  maps.forEach((m) => m.apply());
+}
+
+// ---------------------------------------------------------------------
+// Panel
+// ---------------------------------------------------------------------
+
+// The keys that switch overlays (js/shortcuts.js) are noted in the rows.
+const DESCRIPTIONS = {
+  network: "Width by stream order · key R",
+  soil: "Soilscapes, LandIS",
+  landcover: "UKCEH, 10 m, Great Britain",
+};
+const ZOOM_IN = "Zoom in to view";
+const FLOW_LABEL = "Animate flow direction (key F)";
+
+function panelMarkup() {
+  const wfdOptions = WFD_CATCHMENTS.fields
+    .map((f) => `<calcite-option value="${escapeHtml(f.field)}">${escapeHtml(f.label)}</calcite-option>`)
+    .join("");
+  return `
+    <div class="sidePanelBody">
+      <calcite-list class="layerList" label="Map layers" selection-mode="none" scale="s">
+        <calcite-list-item-group heading="Background - one at a time">
+          <calcite-list-item label="WFD waterbody classification" description="Environment Agency, 2025">
+            <calcite-switch slot="content-end" data-wfd scale="s" label="WFD waterbody classification"></calcite-switch>
+            <div slot="content-bottom" class="layerOptions" data-wfd-options hidden>
+              <calcite-label layout="inline-space-between" scale="s">
+                Colour by
+                <calcite-select data-wfd-field scale="s" label="Classification to colour by">${wfdOptions}</calcite-select>
+              </calcite-label>
+            </div>
+          </calcite-list-item>
+          <calcite-list-item data-soil-item label="National Soil Map" description="${DESCRIPTIONS.soil}">
+            <calcite-switch slot="content-end" data-soil scale="s" label="National Soil Map"></calcite-switch>
+          </calcite-list-item>
+          <calcite-list-item data-landcover-item label="${escapeHtml(LAND_COVER.title)}" description="${DESCRIPTIONS.landcover}">
+            <calcite-switch slot="content-end" data-landcover scale="s" label="${escapeHtml(LAND_COVER.title)}"></calcite-switch>
+          </calcite-list-item>
+        </calcite-list-item-group>
+
+        <calcite-list-item-group heading="Overlays">
+          <calcite-list-item data-network-item label="Open River Network" description="${DESCRIPTIONS.network}">
+            <calcite-switch slot="content-end" data-network scale="s" label="Open River Network"></calcite-switch>
+            <div slot="content-bottom" class="layerOptions" data-flow-options hidden>
+              <calcite-label layout="inline" scale="s">
+                <calcite-checkbox data-flow scale="s"></calcite-checkbox>
+                <span data-flow-label>Animate flow direction (key F)</span>
+              </calcite-label>
+            </div>
+          </calcite-list-item>
+          <calcite-list-item label="Storm overflows" description="Live from water companies · key S">
+            <calcite-switch slot="content-end" data-storm scale="s" label="Storm overflows"></calcite-switch>
+            <div slot="content-bottom" class="layerOptions" data-storm-options hidden>
+              <calcite-label layout="inline" scale="s">
+                <calcite-checkbox data-recent scale="s"></calcite-checkbox>
+                Only discharging or in the last 48 hours
+              </calcite-label>
+            </div>
+          </calcite-list-item>
+          <calcite-list-item label="${escapeHtml(EDM_2025.title)}" description="Annual spill returns, sized by spill count · key E">
+            <calcite-switch slot="content-end" data-edm scale="s" label="${escapeHtml(EDM_2025.title)}"></calcite-switch>
+          </calcite-list-item>
+        </calcite-list-item-group>
+      </calcite-list>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------
+// Per-map setup
+// ---------------------------------------------------------------------
+
+export async function setupLayersPanel(mapEl, { isSiteLayer, onSiteClick }) {
+  const view = mapEl.closest(".view");
+  const panel = view?.querySelector(".layersPanel");
+  if (!panel) return;
+
+  const [reactiveUtils] = await $arcgis.import(["@arcgis/core/core/reactiveUtils.js"]);
+  const [soil, wfd, landcover, storm, edm] = await Promise.all([createSoilLayer(), createWfdLayer(), createLandCoverLayer(), createStormOverflowLayers(), createEdmLayer()]);
+
+  // Bottom to top: backgrounds, river network (+ flow), EDM, storm overflows -
+  // all under whatever the tab adds afterwards (the sites).
+  mapEl.map.addMany([landcover, soil, wfd], 0);
+  const { network, flow } = await addRiverNetwork(mapEl, 3);
+  mapEl.map.add(edm, flow ? 5 : 4);
+  mapEl.map.addMany(storm.layers, flow ? 6 : 5);
+
+  // ---- panel ----
+  panel.innerHTML = panelMarkup();
+  const q = (selector) => panel.querySelector(selector);
+  const el = {
+    wfd: q("[data-wfd]"),
+    wfdOptions: q("[data-wfd-options]"),
+    wfdField: q("[data-wfd-field]"),
+    soil: q("[data-soil]"),
+    soilItem: q("[data-soil-item]"),
+    landcover: q("[data-landcover]"),
+    landcoverItem: q("[data-landcover-item]"),
+    network: q("[data-network]"),
+    networkItem: q("[data-network-item]"),
+    flow: q("[data-flow]"),
+    flowLabel: q("[data-flow-label]"),
+    flowOptions: q("[data-flow-options]"),
+    storm: q("[data-storm]"),
+    stormOptions: q("[data-storm-options]"),
+    recent: q("[data-recent]"),
+    edm: q("[data-edm]"),
+    // In the map's Legend panel (tool-panels.js), not this one.
+    legend: view.querySelector("[data-legend]"),
+    legendEmpty: view.querySelector("[data-legend-empty]"),
+  };
+
+  // Land cover has no legend from its service: a hand-drawn one sits under
+  // the ArcGIS legend in the Legend panel.
+  el.landcoverLegend = document.createElement("div");
+  el.landcoverLegend.className = "landcoverLegend";
+  el.landcoverLegend.hidden = true;
+  el.landcoverLegend.innerHTML = `<h4>${escapeHtml(LAND_COVER.title)}</h4>` + LAND_COVER.classes
+    .map(([name, color]) => `<div class="landcoverRow"><span class="landcoverSwatch" style="background:${color}"></span>${escapeHtml(name)}</div>`)
+    .join("");
+  el.legend.after(el.landcoverLegend);
+
+  const on = (target, event, fn) => target.addEventListener(event, fn);
+  on(el.wfd, "calciteSwitchChange", () => change({ wfd: el.wfd.checked }));
+  on(el.soil, "calciteSwitchChange", () => change({ soil: el.soil.checked }));
+  on(el.landcover, "calciteSwitchChange", () => change({ landcover: el.landcover.checked }));
+  on(el.network, "calciteSwitchChange", () => change({ network: el.network.checked }));
+  on(el.flow, "calciteCheckboxChange", () => change({ flow: el.flow.checked }));
+  on(el.storm, "calciteSwitchChange", () => change({ storm: el.storm.checked }));
+  on(el.recent, "calciteCheckboxChange", () => change({ recent: el.recent.checked }));
+  on(el.edm, "calciteSwitchChange", () => change({ edm: el.edm.checked }));
+  on(el.wfdField, "calciteSelectChange", () => change({ wfdField: el.wfdField.value }));
+
+  // ---- follow the shared state ----
+  let stormShown = false;
+  let recentApplied = false;
+  let legendKey = "";
+
+  const inRange = () => mapEl.view.scale <= RIVER_NETWORK.minScale;
+
+  // The network and soil map only draw zoomed in past minScale: their
+  // switches say so and are disabled until then. Flow is only offered
+  // while the network is on and drawing (and the WebGL overlay exists).
+  function applyScaleGating() {
+    const ok = inRange();
+    el.network.disabled = !ok || !network;
+    el.soil.disabled = !ok;
+    el.landcover.disabled = !ok;
+    el.landcoverItem.description = ok ? DESCRIPTIONS.landcover : ZOOM_IN;
+    el.networkItem.description = ok ? DESCRIPTIONS.network : ZOOM_IN;
+    el.soilItem.description = ok ? DESCRIPTIONS.soil : ZOOM_IN;
+    el.flowOptions.hidden = !(ok && state.network && flow);
+    // Flow only runs zoomed in much further; once on it can always be
+    // switched off.
+    const close = mapEl.view.scale <= RIVER_NETWORK.flowMinScale;
+    el.flow.disabled = !close && !state.flow;
+    el.flowLabel.textContent = close || state.flow ? FLOW_LABEL : "Zoom in further to animate flow direction";
+  }
+
+  function applyLegend() {
+    const infos = [];
+    if (state.wfd) infos.push({ layer: wfd, title: wfd.title });
+    if (state.network) infos.push({ layer: network, title: network.title });
+    if (state.soil) infos.push({ layer: soil, title: soil.title });
+    if (state.edm) infos.push({ layer: edm, title: edm.title });
+    if (state.storm) infos.push({ layer: storm.layers[0], title: storm.layers[0].title });
+    const key = infos.map((i) => `${i.layer.id}|${i.title}`).join(",");
+    if (key !== legendKey) {
+      legendKey = key;
+      el.legend.layerInfos = infos;
+    }
+    el.legend.hidden = !infos.length;
+    el.landcoverLegend.hidden = !state.landcover;
+    el.legendEmpty.hidden = infos.length > 0 || state.landcover;
+  }
+
+  function apply() {
+    // layers
+    wfd.visible = state.wfd;
+    soil.visible = state.soil;
+    landcover.visible = state.landcover;
+    if (wfd.title !== wfdTitle(state.wfdField)) {
+      wfd.renderer = wfdRenderer(state.wfdField);
+      wfd.title = wfdTitle(state.wfdField);
+    }
+    if (flow) flow.visible = state.flow && state.network; // off before the network goes
+    network.visible = state.network;
+    if (edm.visible !== state.edm) {
+      edm.visible = state.edm;
+      if (!state.edm) mapEl.closePopup();
+    }
+    if (stormShown !== state.storm) {
+      stormShown = state.storm;
+      storm.setVisible(state.storm);
+      if (!state.storm) mapEl.closePopup();
+    }
+    if (recentApplied !== state.recent) {
+      recentApplied = state.recent;
+      storm.setRecentOnly(state.recent);
+    }
+
+    // panel controls
+    el.wfd.checked = state.wfd;
+    el.wfdOptions.hidden = !state.wfd;
+    el.wfdField.value = state.wfdField;
+    el.soil.checked = state.soil;
+    el.landcover.checked = state.landcover;
+    el.network.checked = state.network;
+    el.flow.checked = state.flow;
+    el.storm.checked = state.storm;
+    el.stormOptions.hidden = !state.storm;
+    el.recent.checked = state.recent;
+    el.edm.checked = state.edm;
+    applyScaleGating();
+    applyLegend();
+  }
+
+  maps.add({ apply, view: mapEl.view, canFlow: !!flow });
+  reactiveUtils.watch(() => mapEl.view.scale, applyScaleGating);
+  apply();
+  initMapClicks(mapEl, network, { isSiteLayer, onSiteClick });
+  initBackgroundHover(mapEl, soil, landcover);
+}
+
+// ---------------------------------------------------------------------
+// Background type on hover: while the National Soil Map or the Land Cover
+// Map is showing, a small label next to the pointer names the soil / land
+// cover under it. Land cover is a WMS, so it asks the service (GetFeatureInfo).
+// ---------------------------------------------------------------------
+
+async function landCoverAt(view, point) {
+  const e = view.extent;
+  const params = new URLSearchParams({
+    service: "WMS", version: "1.3.0", request: "GetFeatureInfo",
+    layers: LAND_COVER.sublayer, query_layers: LAND_COVER.sublayer, styles: "",
+    crs: "EPSG:3857", bbox: [e.xmin, e.ymin, e.xmax, e.ymax].join(","),
+    width: Math.round(view.width), height: Math.round(view.height),
+    i: Math.round(point.x), j: Math.round(point.y), info_format: "text/plain",
+  });
+  const text = await (await fetch(`${LAND_COVER.url}?${params}`)).text();
+  return /^\s*class = '([^']*)'/m.exec(text)?.[1] ?? "";
+}
+
+function initBackgroundHover(mapEl, soil, landcover) {
+  const tip = document.createElement("div");
+  tip.className = "mapHoverTip";
+  tip.hidden = true;
+  mapEl.parentElement.append(tip);
+  let latest = 0;
+  let shown = "";
+
+  const hide = () => { latest++; tip.hidden = true; shown = ""; };
+
+  mapEl.addEventListener("arcgisViewPointerMove", async (event) => {
+    const useSoil = soil.visible && mapEl.view.scale <= soil.minScale;
+    const useLandCover = landcover.visible && mapEl.view.scale <= landcover.minScale;
+    if (!useSoil && !useLandCover) { if (!tip.hidden) hide(); return; }
+    const point = event.detail;
+    const request = ++latest;
+    let name = "";
+    if (!useSoil) await new Promise((r) => setTimeout(r, 120)); // don't hit the service on every pixel moved
+    if (request !== latest) return;
+    try {
+      if (useSoil) {
+        const { results } = await mapEl.hitTest(point, { include: [soil] });
+        name = results.find((r) => r.type === "graphic")?.graphic.attributes?.[SOIL_MAP.field] ?? "";
+      } else {
+        name = await landCoverAt(mapEl.view, point);
+      }
+    } catch { return; }
+    if (request !== latest) return;
+    if (!name) { hide(); return; }
+    if (name !== shown) { tip.textContent = name; shown = name; }
+    const box = mapEl.getBoundingClientRect();
+    const parent = tip.parentElement.getBoundingClientRect();
+    tip.hidden = false;
+    // beside the pointer, flipped to the left near the right-hand edge
+    const flip = point.x + tip.offsetWidth + 24 > box.width;
+    tip.style.left = `${box.left - parent.left + point.x + (flip ? -tip.offsetWidth - 14 : 14)}px`;
+    tip.style.top = `${box.top - parent.top + point.y + 14}px`;
+  });
+  mapEl.addEventListener("pointerleave", hide);
+}
+
+// ---------------------------------------------------------------------
+// Keyboard shortcuts (js/shortcuts.js)
+// Each key flips the same shared switch the panel does: "network" (R),
+// "flow" (F - only once the network is on), "storm" (S), "edm" (E). The
+// network only draws zoomed in, and flow only starts zoomed in much
+// further (RIVER_NETWORK.flowMinScale), as in the panel; switching either
+// off always works. Returns false when the key had no effect.
+// ---------------------------------------------------------------------
+
+// The river network and its flow animation on, as if switched on in the
+// panel. Each only draws once zoomed in past its own limit.
+export function showRivers() {
+  change({ network: true, flow: true });
+}
+
+export function toggleOverlay(key, mapEl) {
+  const scale = mapEl?.view?.scale;
+  const drawing = scale <= RIVER_NETWORK.minScale;
+  const close = scale <= RIVER_NETWORK.flowMinScale;
+  const map = [...maps].find((m) => m.view === mapEl?.view);
+  switch (key) {
+    case "network":
+      if (!drawing && !state.network) return false;
+      change({ network: !state.network });
+      return true;
+    case "flow":
+      if (!state.flow && (!close || !state.network || !map?.canFlow)) return false;
+      change({ flow: !state.flow });
+      return true;
+    case "storm":
+    case "edm":
+      change({ [key]: !state[key] });
+      return true;
+    default:
+      return false;
+  }
+}
+
+// ---------------------------------------------------------------------
+// Map clicks
+// ---------------------------------------------------------------------
+
+// Pop-ups are opened here rather than by the map's own click handling,
+// because river lines are only a pixel or two wide: a click near one has
+// to be matched to the nearest river by hand. In order: a site under the
+// click goes to the tab (onSiteClick, with the click's native event, for
+// Ctrl/Cmd-click); a storm overflow or EDM outfall its pop-up;
+// failing that, with the network switched on and drawing, the nearest
+// river within RIVER_CLICK_TOLERANCE pixels; failing that, nothing, and
+// any open pop-up closes.
+const RIVER_CLICK_TOLERANCE = 8;
+
+function initMapClicks(mapEl, network, { isSiteLayer, onSiteClick }) {
+  let latest = 0; // a newer click supersedes one still being worked out
+  mapEl.popupDisabled = true;
+
+  mapEl.addEventListener("arcgisViewClick", async (event) => {
+    const click = event.detail;
+    const request = ++latest;
+    const { results } = await mapEl.hitTest(click);
+    if (request !== latest) return;
+
+    const graphics = results.filter((r) => r.type === "graphic").map((r) => r.graphic);
+
+    // A site: the tab opens its panel (no pop-up).
+    const site = graphics.find((g) => isSiteLayer(g.layer));
+    if (site) {
+      mapEl.closePopup();
+      onSiteClick(site, click.native);
+      return;
+    }
+
+    // Anything else with a pop-up (storm overflows): the features the hit
+    // test found, rather than asking the map to look them up again (that
+    // finds nothing for the storm overflows).
+    const hasPopup = (layer) => layer?.popupEnabled !== false && layer?.popupTemplate;
+    const clicked = graphics.filter((g) => hasPopup(g.layer));
+    if (clicked.length) {
+      mapEl.openPopup({ features: clicked, location: click.mapPoint });
+      return;
+    }
+
+    const view = mapEl.view;
+    if (!network.visible || view.scale > network.minScale) {
+      mapEl.closePopup();
+      return;
+    }
+    const [distanceOperator] = await $arcgis.import(["@arcgis/core/geometry/operators/distanceOperator.js"]);
+    const { features } = await network.queryFeatures({
+      geometry: click.mapPoint,
+      distance: RIVER_CLICK_TOLERANCE * view.resolution,
+      units: "meters",
+      spatialRelationship: "intersects",
+      outFields: RIVER_POPUP_FIELDS,
+      returnGeometry: true,
+      outSpatialReference: view.spatialReference,
+    });
+    if (request !== latest) return;
+    const nearest = features
+      .map((f) => ({ f, d: distanceOperator.execute(click.mapPoint, f.geometry) }))
+      .sort((a, b) => a.d - b.d)[0]?.f;
+    if (!nearest) {
+      mapEl.closePopup();
+      return;
+    }
+    nearest.popupTemplate = riverPopupTemplate();
+    mapEl.openPopup({ features: [nearest], location: click.mapPoint });
+  });
+}

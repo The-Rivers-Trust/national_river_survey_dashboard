@@ -1,0 +1,226 @@
+/* =====================================================================
+   LEAGUE TABLES + ORGANISATION TABS
+   Full-width scrolling pages: the site league table and the
+   organisation's equipment cards.
+   ===================================================================== */
+.leagueHeader {
+  margin-bottom: var(--space-4);
+}
+
+.leagueHeader h2 {
+  margin: 0 0 2px;
+  font-size: 18px;
+}
+
+.leagueSubtitle {
+  margin: 0 0 var(--space-1);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- League table ---- */
+.leagueSelectionBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--accent-bg);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+/* The table sits on its own surface, edged by a hairline. */
+.viewInner .tableScroll {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.leagueTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.leagueTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Fixed layout = equal column widths (see the colgroup in
+   league-table.js), so long headers and site names wrap. */
+.leagueTable {
+  table-layout: fixed;
+}
+
+.leagueTable th,
+.leagueTable td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.leagueTable thead th {
+  vertical-align: bottom;
+}
+
+.leagueTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-1);
+  cursor: pointer;
+  user-select: none;
+  /* One line, at the size fitHeaders() in league-table.js picks to fit
+     the columns. Not upper case - capitals are ~20% wider, and would
+     turn mg/L into MG/L. */
+  font-size: var(--league-head-size, 12px);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  color: var(--text-secondary);
+}
+
+.leagueTable th.leagueColCheck {
+  cursor: default;
+}
+
+.leagueTable th:hover:not(.leagueColCheck) {
+  color: var(--accent);
+}
+
+.leagueTable th:focus-visible,
+.leagueTable tbody tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.leagueTable tbody tr {
+  cursor: pointer;
+}
+
+.leagueTable tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.leagueTable tbody tr.isPicked {
+  background: var(--accent-bg);
+}
+
+.leagueColCheck {
+  width: 1%;
+}
+
+/* The row is the control - the box only shows its state. */
+.leagueColCheck calcite-checkbox {
+  pointer-events: none;
+}
+
+.leagueColNum {
+  font-variant-numeric: tabular-nums;
+}
+
+.leagueValue {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.leagueSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.leagueBand {
+  display: block;
+  padding-left: 20px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sortArrow {
+  font-size: 0.75em; /* scales with the fitted header size */
+  color: var(--accent);
+}
+
+/* ---- Organisation: equipment cards ---- */
+.orgSubhead {
+  margin: 0 0 var(--space-3);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.equipGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-3);
+}
+
+.equipCard {
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--metric-color, var(--border));
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.equipMetric {
+  margin-bottom: var(--space-1);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.equipName {
+  font-weight: 600;
+}
+
+.equipMaker {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.equipSpecs {
+  margin: var(--space-2) 0;
+}
+
+.equipSpecs div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 3px 0;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.equipSpecs dt {
+  color: var(--text-secondary);
+}
+
+.equipSpecs dd {
+  margin: 0;
+  text-align: right;
+}
+
+.equipNoData {
+  margin: var(--space-1) 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-muted);
+}

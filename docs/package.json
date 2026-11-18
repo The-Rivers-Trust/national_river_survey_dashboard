@@ -1,0 +1,8 @@
+{
+  "name": "nrs-dashboard",
+  "private": true,
+  "description": "National River Survey dashboard (ArcGIS Maps SDK for JavaScript + Calcite)",
+  "scripts": {
+    "start": "npx --yes http-server@14.1.1 . -p 8081 -c-1 -o"
+  }
+}

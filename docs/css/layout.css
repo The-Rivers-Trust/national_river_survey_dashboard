@@ -1,0 +1,272 @@
+/* =====================================================================
+   LAYOUT
+   Page structure only: shell, header, tabs, views, panels - matching the
+   AQuA dashboard: panels sit edge to edge, divided by hairlines. A tab's
+   own contents have their own file (css/map-tab.css, ...).
+   ===================================================================== */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+}
+
+/* The Rivers Trust logo is wide, not square. */
+calcite-navigation-logo {
+  --calcite-navigation-logo-thumbnail-width: auto;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-inline-end: var(--space-2);
+}
+
+/* Filters shrink before anything overflows the header. */
+.headerFilters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.headerFilter--org {
+  flex: 0 1 240px;
+  min-width: 140px;
+}
+
+.headerFilter--dates {
+  flex: 0 1 300px;
+  min-width: 200px;
+}
+
+/* Everything under the header: tab bar, then the views filling the rest. */
+.appBody {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Calcite draws a focus box round a tab title whenever it has focus,
+   including after a mouse click. Its colour comes from this inherited
+   custom property, so it's made transparent after pointer input only
+   (class toggled in main.js) - keyboard users still see it. */
+.viewTabs.pointerFocus {
+  --calcite-color-focus: transparent;
+}
+
+.viewTabs {
+  flex: 0 0 auto;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  padding-inline: var(--space-4);
+}
+
+/* Views stack here and only the selected one is shown. */
+.views {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  min-height: 0;
+}
+
+.view[hidden] {
+  display: none;
+}
+
+/* Page tabs (League tables, Organisation, Schematics). */
+.viewInner {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: var(--space-6);
+}
+
+/* ---- Map view: controls panel on the left, the map (with the trend
+   chart sliding up under it) in the middle, and the site panel on the
+   right while a site is selected. Expanding the map hides both side
+   panels. ---- */
+.sidePanel {
+  flex: 0 0 340px;
+  border-inline-end: 1px solid var(--border);
+}
+
+.sidePanelBody {
+  padding: var(--space-4);
+}
+
+.mapColumn {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The map and its tool panels: the panels are positioned over the map. */
+.mapStage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mapStage > .siteMap {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- Tool panels (Map layers, Basemap, Legend): closed until their button
+   on the map is pressed, one open at a time (js/map/tool-panels.js). They
+   open OVER the map (the map doesn't resize, so the buttons stay where
+   they are): a floating card to the left of the button column, below the
+   search box. ---- */
+.toolPanel {
+  position: absolute;
+  top: 64px;
+  right: 64px;
+  /* a calcite-panel sets its own 100% height, so top + bottom won't do */
+  height: calc(100% - 124px); /* leaves the bottom row (scale bar, attribution) clear */
+  width: 380px;
+  max-width: calc(100% - 76px);
+  z-index: 5;
+  box-sizing: border-box;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.toolPanel[closed] {
+  display: none;
+}
+
+/* A calcite-panel's header has a very high z-index of its own; keeping each
+   panel's stacking to itself stops one panel's header drawing over another
+   panel placed on top of it (the site sheet on a phone). */
+.sidePanel,
+.toolPanel,
+.sitePanel {
+  isolation: isolate;
+}
+
+/* The site panel: down the right of the map while a site is selected. */
+.sitePanel {
+  flex: 0 0 380px;
+  min-width: 0;
+  border-inline-start: 1px solid var(--border);
+}
+
+.sitePanel[closed],
+.view--map.isExpanded .sidePanel,
+.view--map.isExpanded .sitePanel {
+  display: none;
+}
+
+/* The map draws a focus ring round the whole view whenever it has focus -
+   including after every mouse click/drag. In SDK 5.x the ring lives in
+   <arcgis-map>'s shadow DOM; its colour falls back to this inherited
+   custom property, so making it transparent hides it. Applied only after
+   pointer input (js/map/map-common.js) so keyboard users still see it. */
+.siteMap.pointerFocus {
+  --arcgis-internal-view-color-focus: transparent;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+/* Full-width segmented controls: equal-width buttons. Calcite sizes
+   each item from its label (flex-basis auto), so longer labels get wider
+   buttons - a zero basis shares the width out evenly instead. */
+calcite-segmented-control[width="full"] > calcite-segmented-control-item {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Below laptop width (about 1180px) a map with the left panel AND the site
+   panel open would be squeezed to nothing, so the left panel moves under the
+   map and the site panel becomes a sheet over the lower part of the screen. */
+@media (max-width: 1180px) {
+  .sitePanel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
+    flex: none;
+    height: 75%;
+    border-inline-start: 0;
+    border-top: 1px solid var(--border);
+    background: var(--bg-page);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .view--map {
+    flex-direction: column-reverse;
+  }
+
+  .sidePanel {
+    flex: 0 0 40%;
+    border-inline-end: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .viewTabs {
+    padding-inline: var(--space-2);
+  }
+}
+
+/* Tablet widths: the logo gives way to the filters, so the header buttons
+   stay on screen. */
+@media (max-width: 900px) {
+  calcite-navigation-logo {
+    display: none;
+  }
+
+  #datePresets {
+    display: none;
+  }
+}
+
+/* Phone width */
+@media (max-width: 720px) {
+  /* The tool panel takes the map's width below the search box (it covers
+     the buttons; its own close icon closes it). */
+  .toolPanel {
+    right: 8px;
+    max-width: calc(100% - 16px);
+  }
+
+  .headerFilter--org,
+  .headerFilter--dates {
+    min-width: 0;
+  }
+
+  .viewInner {
+    padding: var(--space-4);
+  }
+}

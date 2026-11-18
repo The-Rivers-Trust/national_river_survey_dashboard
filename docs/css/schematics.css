@@ -1,0 +1,221 @@
+/* =====================================================================
+   SCHEMATICS TAB
+   Metro-map style river diagrams, one card per river system, each with
+   its numbered site list (js/tabs/schematics-tab.js,
+   js/charts/river-schematic.js).
+   ===================================================================== */
+.schemControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+  margin-bottom: var(--space-4);
+}
+
+.schemControls[hidden] {
+  display: none;
+}
+
+.schemMetricLabel {
+  --calcite-label-margin-bottom: 0;
+}
+
+.schemKey {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.schemKey li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.schemKeySwatch {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.schemKeySwatch--none {
+  border: 2px solid var(--text-muted);
+}
+
+.schemIntro {
+  max-width: 900px;
+  margin-bottom: var(--space-4);
+}
+
+/* ---- One section per river system ---- */
+.schemCard {
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.schemFigure {
+  margin: 0;
+}
+
+.schemCaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--space-2);
+}
+
+.schemTitle {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.schemSubtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.schemScroll {
+  overflow-x: auto;
+}
+
+.schemSvg {
+  display: block;
+  overflow: visible;
+  font-family: var(--font-family);
+}
+
+.schemLine {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.schemLine--main {
+  stroke: var(--text-secondary);
+  stroke-width: 7;
+}
+
+.schemJunction {
+  fill: var(--text-secondary);
+}
+
+/* 2px ring in the page colour, so stations stand off the line. */
+.schemStation {
+  stroke: var(--bg-page);
+  stroke-width: 2;
+  paint-order: stroke;
+}
+
+.schemStation--none {
+  fill: var(--bg-page);
+  stroke: var(--text-muted);
+  stroke-width: 2;
+}
+
+.schemRiver {
+  fill: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.schemRiver--stretch {
+  font-weight: 500;
+  fill: var(--text-secondary);
+}
+
+.schemSite {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+
+.schemFlow {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+
+.schemHit {
+  fill: transparent;
+  cursor: default;
+  outline: none;
+}
+
+.schemHit:focus-visible,
+.schemHit.isActive {
+  fill: var(--accent);
+  fill-opacity: 0.18;
+}
+
+/* ---- Numbered site list under each diagram ---- */
+.schemSiteList {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 2px var(--space-4);
+  font-size: 12px;
+}
+
+.schemSiteList li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 2px var(--space-1);
+  border-radius: var(--radius);
+}
+
+.schemSiteList li.isActive {
+  background: var(--accent-bg);
+}
+
+.schemSiteNumber {
+  flex: 0 0 1.8em;
+  text-align: right;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.schemSiteName {
+  flex: 1;
+  min-width: 0;
+}
+
+.schemSiteValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Sites that couldn't be placed ---- */
+.schemOffNetwork {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.schemOffNetwork calcite-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}

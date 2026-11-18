@@ -1,0 +1,56 @@
+/* =====================================================================
+   THEME
+   App-level tokens, all derived from Calcite's own CSS variables (loaded
+   from the Calcite stylesheet in index.html), so dark/light switching is
+   handled by Calcite's calcite-mode-dark / calcite-mode-light classes on
+   <html> and nothing here needs a second copy per theme.
+
+   Use these names in the other stylesheets and in any styles written
+   from JS. If a value isn't covered by Calcite, define it here with both
+   a dark and a light value under html[data-theme].
+   ===================================================================== */
+:root {
+  --bg-page:        var(--calcite-color-background);
+  --surface-1:      var(--calcite-color-foreground-1);
+  --surface-2:      var(--calcite-color-foreground-2);
+  --surface-3:      var(--calcite-color-foreground-3);
+  --text-primary:   var(--calcite-color-text-1);
+  --text-secondary: var(--calcite-color-text-2);
+  --text-muted:     var(--calcite-color-text-3);
+  --border:         var(--calcite-color-border-2);
+  --border-subtle:  var(--calcite-color-border-3);
+  --accent:         var(--calcite-color-brand);
+  --accent-hover:   var(--calcite-color-brand-hover);
+
+  --status-success: var(--calcite-color-status-success);
+  --status-warning: var(--calcite-color-status-warning);
+  --status-danger:  var(--calcite-color-status-danger);
+  --status-neutral: var(--text-muted);
+
+  /* Tinted backgrounds for tags, badges and pills. */
+  --accent-bg:         color-mix(in srgb, var(--accent) 16%, transparent);
+  --status-success-bg: color-mix(in srgb, var(--status-success) 16%, transparent);
+  --status-warning-bg: color-mix(in srgb, var(--status-warning) 16%, transparent);
+  --status-danger-bg:  color-mix(in srgb, var(--status-danger) 16%, transparent);
+  --status-neutral-bg: color-mix(in srgb, var(--status-neutral) 16%, transparent);
+
+  /* Readings at/beyond the equipment's detection range (trend chart). */
+  --limit-ring: rgba(214, 45, 38, 0.55);
+
+  --font-family: var(--calcite-font-family, "Avenir Next", "Avenir", "Helvetica Neue", sans-serif);
+  --radius: 4px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+}
